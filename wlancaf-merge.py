@@ -62,11 +62,11 @@ def repo():
     staging = "drivers/staging"
     if wlan_type == "qcacld":
         repo_url = {
-            "qcacld-3.0": "https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qcacld-3.0",
             "fw-api": "https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/fw-api/",
-            "qca-wifi-host-cmn": "https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qca-wifi-host-cmn/"
+            "qca-wifi-host-cmn": "https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qca-wifi-host-cmn/",
+            "qcacld-3.0": "https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qcacld-3.0"
         }
-        subdir = ['qcacld-3.0', 'fw-api', 'qca-wifi-host-cmn']
+        subdir = ['fw-api', 'qca-wifi-host-cmn' 'qcacld-3.0']
     elif wlan_type == "prima":
         repo_url = "https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/prima/"
         subdir = "prima"
@@ -84,9 +84,9 @@ def check():
                     continue
                 else:
                     print("%s exist but it's empty, continuing..." % subdirs)
-                    if subdirs == "qca-wifi-host-cmn" and not listdir(join(staging, "qcacld-3.0")) \
-                                                      and not listdir(join(staging, "fw-api")) \
-                                                      and not listdir(join(staging, "qca-wifi-host-cmn")):
+                    if subdirs == "qcacld-3.0" and not listdir(join(staging, "fw-api")) \
+                                               and not listdir(join(staging, "qca-wifi-host-cmn")) \
+                                               and not listdir(join(staging, "qcacld-3.0")):
                         print()
                         return True
         else:
@@ -99,9 +99,9 @@ def check():
                     continue
                 else:
                     print("%s exist and not empty, continuing..." % subdirs)
-                    if subdirs == "qca-wifi-host-cmn" and listdir(join(staging, "qcacld-3.0")) \
-                                                      and listdir(join(staging, "fw-api")) \
-                                                      and listdir(join(staging, "qca-wifi-host-cmn")):
+                    if subdirs == "qcacld-3.0" and listdir(join(staging, "fw-api")) \
+                                               and listdir(join(staging, "qca-wifi-host-cmn")) \
+                                               and listdir(join(staging, "qcacld-3.0")):
                         print()
                         return True
         else:

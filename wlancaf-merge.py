@@ -89,6 +89,8 @@ def check():
                                                and not listdir(join(staging, "qcacld-3.0")):
                         print()
                         return True
+            else:
+                return True
         else:
             err("you might want to use --init initial, because those 3 are exists, \nor one of them is exist and not empty.")
     elif wlan_type == "qcacld" and merge_type == "update":
@@ -104,6 +106,8 @@ def check():
                                                and listdir(join(staging, "qcacld-3.0")):
                         print()
                         return True
+            else:
+                continue
         else:
             err("you might want to use --init initial, because those 3 aren't exists.\nor exists but one of them has an empty folder.")
     elif wlan_type == "prima" and merge_type == "initial":

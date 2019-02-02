@@ -66,7 +66,7 @@ def repo():
             "qca-wifi-host-cmn": "https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qca-wifi-host-cmn/",
             "qcacld-3.0": "https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qcacld-3.0"
         }
-        subdir = ['fw-api', 'qca-wifi-host-cmn' 'qcacld-3.0']
+        subdir = ['fw-api', 'qca-wifi-host-cmn', 'qcacld-3.0']
     elif wlan_type == "prima":
         repo_url = "https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/prima/"
         subdir = "prima"
@@ -90,7 +90,7 @@ def check():
                         print()
                         return True
         else:
-            err("you might want to use --init update, because those 3 aren't exists,\nor exists but not empty.")
+            err("you might want to use --init initial, because those 3 are exists, \nor one of them is exist and not empty.")
     elif wlan_type == "qcacld" and merge_type == "update":
         for subdirs in subdir:
             if exists(join(staging, subdirs)) and isdir(join(staging, subdirs)):

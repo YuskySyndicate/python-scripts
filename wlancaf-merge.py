@@ -4,8 +4,6 @@ import sys
 from argparse import ArgumentParser
 from os import listdir
 from os.path import isdir, isfile, exists, join
-from shutil import rmtree
-from multiprocessing import Process
 from subprocess import PIPE, Popen
 
 
@@ -92,7 +90,7 @@ def check():
             else:
                 return True
         else:
-            err("you might want to use --init initial, because those 3 are exists, \nor one of them is exist and not empty.")
+            err("you might want to use --init initial, because those 3 are exists,\nor one of them is exist and not empty.")
     elif wlan_type == "qcacld" and merge_type == "update":
         for subdirs in subdir:
             if exists(join(staging, subdirs)) and isdir(join(staging, subdirs)):
@@ -109,7 +107,7 @@ def check():
             else:
                 continue
         else:
-            err("you might want to use --init initial, because those 3 aren't exists.\nor exists but one of them has an empty folder.")
+            err("you might want to use --init update, because those 3 aren't exists.\nor exists but one of them has an empty folder.")
     elif wlan_type == "prima" and merge_type == "initial":
             if exists(join(staging, subdir)) and isdir(join(staging, subdir)):
                 if listdir(join(staging, subdir)):
@@ -119,13 +117,13 @@ def check():
                     return True
     elif wlan_type == "prima" and merge_type == "update":
         if not exists(join(staging, subdir)):
-            err("you might want to use --init initial, because prima isn't exist")
-        elif exists(join(staging, subdir)):
+            err("you might want to use --init initial, because prima isn't exist.")
+        elif exists(join(staging, subdir)) and isdir(join(staging, subdir)):
             if listdir(join(staging, subdir)):
                 print("prima exists and not empty, continuing...")
                 return True
             else:
-                err("folder prima exist, but it's just an empty folder")
+                err("folder prima exist, but it's just an empty folder.")
 
 
 def merge():

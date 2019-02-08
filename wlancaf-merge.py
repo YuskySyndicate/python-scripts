@@ -2,14 +2,15 @@
 #
 # Copyright (C) 2019 Adek Maulana
 #
-# A simple script to add/update QCACLD or PRIMA into/for your, Android kernel source. *only qcacld-3.0 and prima were supported
+# A simple script to add/update QCACLD or PRIMA into/for your,
+# Android kernel source. *only qcacld-3.0 and prima were supported.
 
 from __future__ import print_function
 
 import sys
 from argparse import ArgumentParser
 from os import listdir
-from os.path import isdir, isfile, exists, join
+from os.path import isdir, exists, join
 from subprocess import PIPE, Popen
 
 
@@ -89,14 +90,16 @@ def check():
                 else:
                     print("%s exist but it's empty, continuing..." % subdirs)
                     if subdirs == "qcacld-3.0" and not listdir(join(staging, "fw-api")) \
-                                               and not listdir(join(staging, "qca-wifi-host-cmn")) \
-                                               and not listdir(join(staging, "qcacld-3.0")):
+                        and not listdir(join(staging, "qca-wifi-host-cmn")) \
+                            and not listdir(join(staging, "qcacld-3.0")):
                         print()
                         return True
             else:
                 return True
         else:
-            err("you might want to use --init initial, because those 3 are exists,\nor one of them is exist and not empty.")
+            err("you might want to use --init initial, "
+                "because those 3 are exists, "
+                "\nor one of them is exist and not empty.")
     elif wlan_type == "qcacld" and merge_type == "update":
         for subdirs in subdir:
             if exists(join(staging, subdirs)) and isdir(join(staging, subdirs)):
@@ -106,30 +109,35 @@ def check():
                 else:
                     print("%s exist and not empty, continuing..." % subdirs)
                     if subdirs == "qcacld-3.0" and listdir(join(staging, "fw-api")) \
-                                               and listdir(join(staging, "qca-wifi-host-cmn")) \
-                                               and listdir(join(staging, "qcacld-3.0")):
+                        and listdir(join(staging, "qca-wifi-host-cmn")) \
+                            and listdir(join(staging, "qcacld-3.0")):
                         print()
                         return True
             else:
                 continue
         else:
-            err("you might want to use --init update, because those 3 aren't exists.\nor exists but one of them has an empty folder.")
+            err("you might want to use --init update, "
+                "because those 3 aren't exists."
+                "\nor exists but one of them has an empty folder.")
     elif wlan_type == "prima" and merge_type == "initial":
-            if exists(join(staging, subdir)) and isdir(join(staging, subdir)):
-                if listdir(join(staging, subdir)):
-                    err("you might want to use --init update, because prima is exist and it isn't empty.")
-                else:
-                    print("prima exists but folder is empty, continuing...")
-                    return True
-    elif wlan_type == "prima" and merge_type == "update":
-        if not exists(join(staging, subdir)):
-            err("you might want to use --init initial, because prima isn't exist.")
-        elif exists(join(staging, subdir)) and isdir(join(staging, subdir)):
+        if exists(join(staging, subdir)) and isdir(join(staging, subdir)):
             if listdir(join(staging, subdir)):
-                print("prima exists and not empty, continuing...")
+                err("you might want to use --init update, "
+                    "\nbecause prima is exist and it isn't empty.")
+            else:
+                print("prima exists but folder is empty, continuing...")
+                return True
+        else:
+            return True
+    elif wlan_type == "prima" and merge_type == "update":
+        if exists(join(staging, subdir)) and isdir(join(staging, subdir)):
+            if listdir(join(staging, subdir)):
                 return True
             else:
                 err("folder prima exist, but it's just an empty folder.")
+        else:
+            err("you might want to use --init initial, "
+                "because prima isn't exist.")
 
 
 def merge():
@@ -149,14 +157,14 @@ def merge():
                 break
             while True:
                 print("committing changes...")
-                cmd = "git read-tree --prefix=drivers/staging/%s \
-                       -u FETCH_HEAD" % repos
+                cmd = "git read-tree --prefix=drivers/staging/%s -u FETCH_HEAD" % repos
                 talk = subprocess_run(cmd)
                 break
             while True:
                 cmd = 'git commit -m "%s: Merge init tag \'%s\' into `git rev-parse --abbrev-ref HEAD`"' \
                        % (repos, tag)
                 talk = subprocess_run(cmd)
+                print('\n' + talk[0])
                 break
     elif wlan_type == "qcacld" and merge_type == "update":
         for repos in repo_url:
@@ -164,11 +172,12 @@ def merge():
             cmd = "git fetch %s %s" % (repo_url[repos], tag)
             talk = subprocess_run(cmd)
             while True:
-                print("merging %s into kernel source and committing changes..." % repos)
-                cmd = 'git merge -X subtree=drivers/staging/%s \
-                       --edit -m "%s: Merge tag \'%s\' into `git rev-parse --abbrev-ref HEAD`" FETCH_HEAD --no-edit' \
-                       % (repos, repos, tag)
+                print("merging %s into kernel source and committing changes..."
+                      % repos)
+                cmd = 'git merge -X subtree=drivers/staging/%s --edit -m "%s: Merge tag \'%s\' into `git rev-parse --abbrev-ref HEAD`" FETCH_HEAD --no-edit' \
+                      % (repos, repos, tag)
                 talk = subprocess_run(cmd)
+                print('\n' + talk[0])
                 break
     elif wlan_type == "prima" and merge_type == "initial":
         print("fetching %s with tag '%s'" % (wlan_type, tag))
@@ -177,23 +186,24 @@ def merge():
         print("merging %s into kernel source..." % wlan_type)
         cmd = "git merge -s ours --no-commit %s FETCH_HEAD" % extra
         talk = subprocess_run(cmd)
-        cmd = "git read-tree --prefix=drivers/staging/%s \
-               -u FETCH_HEAD" % wlan_type
+        cmd = "git read-tree --prefix=drivers/staging/%s -u FETCH_HEAD" % wlan_type
         talk = subprocess_run(cmd)
         print("committing changes...")
         cmd = 'git commit -m "%s: Merge init tag \'%s\' into `git rev-parse --abbrev-ref HEAD`"' \
               % (wlan_type, tag)
         talk = subprocess_run(cmd)
+        print('\n' + talk[0])
     elif wlan_type == "prima" and merge_type == "update":
         print("fetching %s with tag '%s'" % (wlan_type, tag))
         cmd = "git fetch %s %s" % (repo_url, tag)
         talk = subprocess_run(cmd)
-        print("merging %s into kernel source and committing changes..." % wlan_type)
-        cmd = 'git merge -X subtree=drivers/staging/%s \
-               --edit -m "%s: Merge tag \'%s\' into `git rev-parse --abbrev-ref HEAD`" FETCH_HEAD --no-edit' \
-               % (wlan_type, wlan_type, tag)
+        print("merging %s into kernel source and committing changes..."
+              % wlan_type)
+        cmd = 'git merge -X subtree=drivers/staging/%s --edit -m "%s: Merge tag \'%s\' into `git rev-parse --abbrev-ref HEAD`" FETCH_HEAD --no-edit' \
+              % (wlan_type, wlan_type, tag)
         talk = subprocess_run(cmd)
-    return talk
+        print('\n' + talk[0])
+    return 0
 
 
 def main():

@@ -8,6 +8,8 @@
 from __future__ import print_function
 
 import sys
+import psutil
+import signal
 from argparse import ArgumentParser
 from os import listdir
 from os.path import isdir, exists, join
@@ -27,6 +29,16 @@ def subprocess_run(cmd):
               'stderr: %s' % (exitCode, talk[0], talk[1]))
         sys.exit(exitCode)
     return talk
+
+
+def kill_subprocess(parent_pid, sig=signal.SIGTERM):
+    try:
+        parent = psutil.Process(parent_pid)
+    except psutil.NoSuchProcess:
+        return
+    children = parent.children(recursive=True)
+    for process in children:
+        process.send_signal(sig)
 
 
 def git_env():

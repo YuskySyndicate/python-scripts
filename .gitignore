@@ -1,0 +1,6 @@
+# Files
+*.json
+*.pickle
+
+# Directory
+/bin

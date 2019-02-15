@@ -17,6 +17,7 @@ from subprocess import PIPE, Popen
 
 
 def subprocess_run(cmd):
+    global exitCode
     subproc = Popen(cmd, stdout=PIPE, stderr=PIPE,
                     shell=True, universal_newlines=True)
     subproc.wait()
@@ -27,7 +28,6 @@ def subprocess_run(cmd):
               'exit code: %d\n'
               'stdout: %s\n'
               'stderr: %s' % (exitCode, talk[0], talk[1]))
-        sys.exit(exitCode)
     return talk
 
 
@@ -169,28 +169,33 @@ def merge():
             print("fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch %s %s' % (repo_url[repos], tag)
             talk = subprocess_run(cmd)
+            if exitCode != 0:
+                return False
             while True:
-                print('merging %s into kernel source...' % repos)
-                cmd = 'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd
-                talk = subprocess_run(cmd)
-                break
-            while True:
-                print('committing changes...')
-                cmd = ('git read-tree --prefix=drivers/staging/%s '
-                       '-u FETCH_HEAD' % repos)
-                talk = subprocess_run(cmd)
-                break
-            while True:
-                cmd = ('git commit -m "%s: Merge init tag \'%s\' into '
-                       '`git rev-parse --abbrev-ref HEAD`"' % (repos, tag))
-                talk = subprocess_run(cmd)
-                print('\n' + talk[0])
+                cmds = [
+                    'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd,
+                    ('git read-tree --prefix=drivers/staging/%s '
+                     '-u FETCH_HEAD' % repos),
+                    ('git commit -m "%s: Merge init tag \'%s\' into '
+                     '`git rev-parse --abbrev-ref HEAD`"' % (repos, tag))
+                ]
+                for cmd in cmds:
+                    talk = subprocess_run(cmd)
+                    if exitCode != 0:
+                        return False
+                    if cmd == cmds[0]:
+                        print('merging %s into kernel source...' % repos)
+                    if cmd == cmds[2]:
+                        print('committing changes...')
+                        print('\n' + talk[0])
                 break
     elif wlan_type == 'qcacld' and merge_type == 'update':
         for repos in repo_url:
             print("fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch %s %s' % (repo_url[repos], tag)
             talk = subprocess_run(cmd)
+            if exitCode != 0:
+                return False
             while True:
                 print('merging %s into kernel source and committing changes...'
                       % repos)
@@ -200,36 +205,51 @@ def merge():
                        'FETCH_HEAD --no-edit'
                        % (repos, repos, tag))
                 talk = subprocess_run(cmd)
+                if exitCode != 0:
+                    return False
                 print('\n' + talk[0])
                 break
     elif wlan_type == 'prima' and merge_type == 'initial':
-        print("fetching %s with tag '%s'" % (wlan_type, tag))
-        cmd = 'git fetch %s %s' % (repo_url, tag)
-        talk = subprocess_run(cmd)
-        print('merging %s into kernel source...' % wlan_type)
-        cmd = 'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd
-        talk = subprocess_run(cmd)
-        cmd = ('git read-tree --prefix=drivers/staging/%s '
-               '-u FETCH_HEAD' % wlan_type)
-        talk = subprocess_run(cmd)
-        print('committing changes...')
-        cmd = ('git commit -m "%s: Merge init tag \'%s\' into '
-               '`git rev-parse --abbrev-ref HEAD`"' % (wlan_type, tag))
-        talk = subprocess_run(cmd)
-        print('\n' + talk[0])
+        cmds = [
+            'git fetch %s %s' % (repo_url, tag),
+            'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd,
+            ('git read-tree --prefix=drivers/staging/%s '
+             '-u FETCH_HEAD' % wlan_type),
+            ('git commit -m "%s: Merge init tag \'%s\' into '
+             '`git rev-parse --abbrev-ref HEAD`"' % (wlan_type, tag))
+        ]
+        for cmd in cmds:
+            talk = subprocess_run(cmd)
+            if exitCode != 0:
+                return False
+            if cmd == cmds[0]:
+                print("fetching %s with tag '%s'" % (wlan_type, tag))
+            if cmd == cmds[1]:
+                print('merging %s into kernel source...' % wlan_type)
+            if cmd == cmds[3]:
+                print('committing changes...')
+        else:
+            print('\n' + talk[0])
     elif wlan_type == 'prima' and merge_type == 'update':
-        print("fetching %s with tag '%s'" % (wlan_type, tag))
-        cmd = 'git fetch %s %s' % (repo_url, tag)
-        talk = subprocess_run(cmd)
-        print('merging %s into kernel source and committing changes...'
-              % wlan_type)
-        cmd = ('git merge -X subtree=drivers/staging/%s '
-               '--edit -m "%s: Merge tag \'%s\' into '
-               '`git rev-parse --abbrev-ref HEAD`" FETCH_HEAD --no-edit'
-               % (wlan_type, wlan_type, tag))
-        talk = subprocess_run(cmd)
-        print('\n' + talk[0])
-    return 0
+        cmds = [
+            'git fetch %s %s' % (repo_url, tag),
+            ('git merge -X subtree=drivers/staging/%s '
+             '--edit -m "%s: Merge tag \'%s\' into '
+             '`git rev-parse --abbrev-ref HEAD`" FETCH_HEAD --no-edit'
+             % (wlan_type, wlan_type, tag))
+        ]
+        for cmd in cmds:
+            talk = subprocess_run(cmd)
+            if exitCode != 0:
+                return False
+            if cmd == cmds[0]:
+                print("fetching %s with tag '%s'" % (wlan_type, tag))
+            if cmd == cmds[1]:
+                print('merging %s into kernel source and committing changes...'
+                      % wlan_type)
+        else:
+            print('\n' + talk[0])
+    return True
 
 
 def main():
@@ -237,7 +257,7 @@ def main():
     repo_url, staging, subdir = repo()
     if not exists('drivers/staging') and not exists('Makefile'):
         err('Please, run this script inside your root kernel source.')
-    if check():
+    if check() is True:
         merge()
 
 

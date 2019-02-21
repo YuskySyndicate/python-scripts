@@ -288,7 +288,7 @@ def toolchain():
     }
 
 
-def make_wrapper():
+def make():
     outdir = variables()['outdir']
     defconfig = variables()['defconfig']
     cc = parameters()['cc']
@@ -306,7 +306,7 @@ def make_wrapper():
     subprocess_run(cmd)
 
 
-def make():
+def make_wrapper():
     build_type = parameters()['type']
     oc = parameters()['overclock']
     device = parameters()['device']
@@ -328,7 +328,7 @@ def make():
                 cmd = f'git revert --no-commit {revert_commit[build_type]}'
             subprocess_run(cmd)
     try:
-        make_wrapper()
+        make()
     except CalledProcessError:
         if exists(join(sourcedir, '.config')
                   ) or exists(join(sourcedir, 'include/config')):
@@ -343,7 +343,7 @@ def make():
                     raise
                 else:
                     print('re-runing the make again...')
-                    make_wrapper()
+                    make()
         else:
             print('failed to make kernel image...')
             return False

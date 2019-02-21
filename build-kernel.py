@@ -2,17 +2,16 @@
 #
 # Copyright (C) 2019 Adek Maulana
 
-from __future__ import print_function
-
 import sys
 import os
 import signal
 import psutil
 from datetime import datetime
 from argparse import ArgumentParser
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, CalledProcessError
 from os import remove, chdir
-from os.path import exists, isfile, expanduser, join, realpath  # , isdir
+from os.path import exists, isfile, expanduser, join, realpath, isdir
+from shutil import copy2 as copy
 from tempfile import mkstemp
 
 
@@ -44,7 +43,10 @@ def parameters():
     param.add_argument('-u', '--upload',
                        help='use this flag to upload the build',
                        action='store_true')
-    param.add_argument('--verbose', action='store_true')
+    param.add_argument('--verbose',
+                       help='choose output of stdout and stderr, PIPE'
+                            'or realtime output',
+                       action='store_true')
     param.add_argument('-v', '--version', required=True)
     param.add_argument('-cc', '--cc', choices=['clang', 'gcc'], required=True)
     params = vars(param.parse_args())
@@ -60,24 +62,19 @@ def parameters():
     cc = params['cc']
     # Check whyred ENV
     if device == 'whyred':
-        if cpuquiet:
-            print('whyred do not have cpuquiet.')
-            cpuquiet = False
-        if oc:
-            print('whyred do not have overclock.')
-            oc = False
-        if build_type == 'custom':
-            print('whyred customROM already dead.')
-            build_type = 'miui'
+        # Let's fail all of this if depencies are met, because i'm stupid.
+        if True in [cpuquiet, oc, build_type]:
+            param.error('\n'
+                        '[-c/--cpuquiet, -o/--overclock, -b/--build = custom]'
+                        ', is not available for whyred')
     elif device == 'mido':
         if cpuquiet is False:
-            print('mido already drop support for non-cpuquiet\n'
-                  'default now is using it.')
-            cpuquiet = True
+            param.error('mido already drop support for non-cpuquiet,\n'
+                        'default now is using it.')
     # Fail build if using version beta|test|personal while using --release
     if version in ['beta' or 'test' or 'personal'] and release is True:
-        err('version beta|test|personal, can not be passed with --release')
-        sys.exit(1)
+        param.error('version beta|test|personal, '
+                    'can not be passed with --release')
     return {
         'type': build_type,
         'cpuquiet': cpuquiet,
@@ -122,6 +119,7 @@ def err(message):
     print(message)
     telegram = parameters()['telegram']
     home = variables()['home']
+    verbose = parameters()['verbose']
     if telegram is True:
         from requests import post
         tg_chat = '-1001354431412'
@@ -130,16 +128,13 @@ def err(message):
         msgtmp = tmp[1]
         with open(msgtmp, 'w', newline='\n') as t:
             t.write('```')
-            t.write('\n')
-            t.write('An error was detected while running '
-                    'the following command:')
+            t.writelines('\n')
+            t.write('Error found while running:')
             t.writelines('\n' + '\n')
             t.write(' '.join(sys.argv[0:]))
             t.writelines('\n' + '\n')
-            t.write('The error was:')
-            t.writelines('\n' + '\n')
             t.write(f'{message}')
-            t.write('\n')
+            t.writelines('\n')
             t.write('```')
         with open(msgtmp, 'r') as t:
             messages = (
@@ -151,16 +146,19 @@ def err(message):
             )
         tg = 'https://api.telegram.org/bot' + token + '/sendMessage'
         telegram = post(tg, params=messages)
-        if telegram.status_code == 200:
-            print('Messages sent...')
-        elif telegram.status_code == 400:
-            print('Bad recipient / Wrong text format...')
-        elif telegram.status_code == 401:
-            print('Wrong / Unauth token...')
-        else:
-            print('Error out of range...')
-        print(telegram.reason)
+        if verbose is True:
+            print()
+            if telegram.status_code == 200:
+                print('Messages sent...')
+            elif telegram.status_code == 400:
+                print('Bad recipient / Wrong text format...')
+            elif telegram.status_code == 401:
+                print('Wrong / Unauth token...')
+            else:
+                print('Error out of range...')
+            print(telegram.reason)
         remove(msgtmp)
+    raise CalledProcessError
 
 
 def kill_subprocess(parent_pid, sig=signal.SIGTERM):
@@ -200,6 +198,7 @@ def variables():
         name = 'Stormguard' + '-' + device + '-' + version + '-' + date_time
         branch = 'R/O/MIUI'
         moduledir = join(anykernel, 'modules/vendor/lib/modules')
+        outmodule = join(outdir, 'drivers/staging/qcacld-3.0/wlan.ko')
     elif device == 'mido':
         name = 'Stormguard'
         defconfig = 'sg_defconfig'
@@ -212,6 +211,7 @@ def variables():
             branch = 'R/N/MIUI'
             version = version + '-' + 'MIUI'
             moduledir = join(anykernel, 'modules/system/lib/modules')
+            outmodule = join(outdir, 'drivers/staging/prima/wlan.ko')
         elif build_type == 'custom':
             branch = 'R/C/P'
             version = version + '-' + 'CUSTOM'
@@ -228,12 +228,15 @@ def variables():
         'image': image,
         'keystore': keystore_password,
         'moduledir': moduledir,
+        'name': name,
         'outdir': outdir,
+        'outmodule': outmodule,
         'rundir': rundir,
         'scriptdir': scriptdir,
         'sourcedir': sourcedir,
         'tcdir': tcdir,
-        'zipdir': zipdir
+        'zipdir': zipdir,
+        'zipname': zipname
     }
 
 
@@ -242,7 +245,10 @@ def toolchain():
     cc = parameters()['cc']
     gcc = join(tcdir, 'google-gcc/bin/aarch64-linux-android-')
     gcc32 = join(tcdir, 'google-gcc-32/bin/arm-linux-androideabi-')
-    tcstrip = join(tcdir, 'google-gcc/bin/aarch64-linux-android-strip')
+    if cc == 'clang':
+        tcstrip = join(tcdir, 'google-clang/bin/llvm-strip')
+    elif cc == 'gcc':
+        tcstrip = join(tcdir, 'google-gcc/bin/aarch64-linux-android-strip')
     if cc == 'clang':
         clang = join(tcdir, 'google-clang/bin/clang')
         clangcc = ' '.join(['ccache', clang])
@@ -268,41 +274,13 @@ def toolchain():
     }
 
 
-def make():
-    build_type = parameters()['type']
-    oc = parameters()['overclock']
+def make_wrapper():
     outdir = variables()['outdir']
-    device = parameters()['device']
     defconfig = variables()['defconfig']
-    sourcedir = variables()['sourcedir']
-    branch = variables()['branch']
     cc = parameters()['cc']
     gcc = toolchain()['gcc']
     gcc32 = toolchain()['gcc32']
     clangopt = toolchain()['clangopt']
-    chdir(sourcedir)
-    '''
-    mido now drop support for non-CPUQuiet
-    because, now we can change default max cpu,
-    so for people who wanted without CPUQuiet
-    they can changed max online cpu to 8, or just change
-    CPUQuiet governor to userspace, and turn on all offlined cpu
-    '''
-    cmd = f'git checkout {branch}'
-    talk = subprocess_run(cmd)
-    if device == 'mido':
-        if oc is False:
-            revert_commit = {
-                'custom': 'None',  # Haven't have time to rebase PIE
-                'miui': '122cc6988b399885ea8918a790c01662a20e8463'
-            }
-            if build_type == 'miui':
-                cmd = f'git revert --no-commit {revert_commit["miui"]}'
-            elif build_type == 'custom':
-                cmd = f'git revert --no-commit {revert_commit["custom"]}'
-            talk = subprocess_run(cmd)
-            if exitCode != 0:
-                return False
     cmd = f'make ARCH=arm64 O="{outdir}" {defconfig}'
     talk = subprocess_run(cmd)
     if cc == 'clang':
@@ -312,37 +290,132 @@ def make():
         cmd = (f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="ccache {gcc}'
                f'CROSS_COMPILE_ARM32="ccache {gcc32}" -j4')
     talk = subprocess_run(cmd)
-    if exitCode != 0:
-        raise ChildProcessError
-        '''
-        TO-DO, clean and restart build if make fail asking `make mrproper`
-        if exists(join(sourcedir, 'include/config')
-                  ) and isdir(join(sourcedir, 'include/config')):
-            cmd = 'make mrproper'
+
+
+def make():
+    build_type = parameters()['type']
+    oc = parameters()['overclock']
+    device = parameters()['device']
+    sourcedir = variables()['sourcedir']
+    branch = variables()['branch']
+    # In-Into sourcedir and change the branch
+    chdir(sourcedir)
+    cmd = f'git checkout {branch}'
+    talk = subprocess_run(cmd)
+    if device == 'mido':
+        if oc is False:
+            revert_commit = {
+                'custom': 'None',  # Haven't have time to rebase PIE
+                'miui': '122cc6988b399885ea8918a790c01662a20e8463'
+            }
+            if build_type == 'miui':
+                cmd = f'git revert --no-commit {revert_commit[build_type]}'
+            elif build_type == 'custom':
+                cmd = f'git revert --no-commit {revert_commit[build_type]}'
             talk = subprocess_run(cmd)
-            return make()
-        '''
+    try:
+        make_wrapper()
+    except CalledProcessError:
+        if exists(join(sourcedir, '.config')
+                  ) or exists(join(sourcedir, 'include/config')):
+            # Just to make sure config is directory
+            if isdir(join(sourcedir, 'include/config')):
+                cmd = 'make mrproper'
+                try:
+                    cmd = 'make mrproper'
+                    talk = subprocess_run(cmd)
+                except CalledProcessError:
+                    print('failed when cleaning, exiting...')
+                    return False
+                else:
+                    print('re-run the make again...')
+                    make_wrapper()
+        else:
+            print('failed to make kernel image...')
+            return False
     else:
-        print('success')
+        print('Successfully built...')
+
 
 def modules():
-    None
-    #  TO-DO
+    build_type = parameters()['type']
+    device = parameters()['device']
+    moduledir = variables()['moduledir']
+    outdir = variables()['outdir']
+    outmodule = variables()['outmodules']
+    srcdir = variables()['sourcedir']
+    tcstrip = toolchain()['strip']
+    if build_type == 'miui':
+        if exists(outmodule) and isfile(outmodule):
+            cmd = f'"{tcstrip}" --strip-unneeded "{outmodule}"'
+            talk = subprocess_run(cmd)
+            if device == 'whyred':
+                cmd = (f'"{outdir}/scripts/sign-file" sha512 '
+                       f'"{outdir}/certs/signing_key.pem" '
+                       f'"{outdir}/certs/signing_key.x509" '
+                       f'"{outmodule}"')
+            elif device == 'mido':
+                cmd = (f'"{srcdir}/scripts/sign-file" sha512 '
+                       f'"{outdir}/certs/signing_key.pem" '
+                       f'"{outdir}/certs/signing_key.x509" '
+                       f'"{outmodule}"')
+            talk = subprocess_run(cmd)
+            if device == 'whyred':
+                copy(outmodule, join(moduledir, 'qca_cld3/qca_cld3_wlan.ko'))
+            elif device == 'mido':
+                copy(outmodule, moduledir)
+                copy(join(moduledir, 'wlan.ko'
+                          ), join(moduledir, 'pronto/pronto_wlan.ko'))
+        else:
+            raise FileNotFoundError(f'{outmodule} not found...')
 
 
 def zip_kernel():
-    None
-    #   TO-DO
+    anykernel = variables()['anykernel']
+    name = variables()['name']
+    rundir = variables()['rundir']
+    zipdir = variables()['zipdir']
+    # TO-DO
 
 
-def googledrive_creds():
-    scriptdir = variables()['scriptdir']
+def GoogleDriveUpload():
     from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.auth.transport.requests import Request
     import pickle
 
-    SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
+    device = parameters()['device']
+    zipname = variables()['zipname']
+    scriptdir = variables()['scriptdir']
+    finalzip = variables()['finalzip']
+
+    folder_id = {
+        'cpuquiet': '1i5XRVcO3Q8y8OFAOxXU-UWGWmQJiKo2u',
+        'whyred': '1YjsSb1JYqWOANua07kd_UN4q2vPoq1iv',
+        'mido': '1fkEmVBKD0cHMY1kbkpr4Bwm9v3COPPjf'
+    }
+
+    if device == 'whyred':
+        folder_id = folder_id['whyred']
+    elif device == 'mido':
+        folder_id = folder_id['cpuquiet']
+
+    file_metadata = {
+        'name': zipname,
+        'parents': [folder_id]
+    }
+    media = MediaFileUpload(finalzip,
+                            mimetype='application/zip',
+                            resumable=True)
+
+    SCOPES = [
+        'https://www.googleapis.com/auth/drive',
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive.appdata',
+        'https://www.googleapis.com/auth/drive.apps.readonly'
+    ]
+
     creds = None
     if exists(join(scriptdir, 'token.pickle')
               ) and isfile(join(scriptdir, 'token.pickle')):
@@ -359,17 +432,11 @@ def googledrive_creds():
             pickle.dump(creds, token)
 
     service = build('drive', 'v3', credentials=creds)
-    return service
-
-
-def googledrive_upload():
-    service = googledrive_creds()
-    folder = {
-        'cpuquiet': '1i5XRVcO3Q8y8OFAOxXU-UWGWmQJiKo2u',
-        'whyred': '1YjsSb1JYqWOANua07kd_UN4q2vPoq1iv',
-        'mido': '1fkEmVBKD0cHMY1kbkpr4Bwm9v3COPPjf'
-    }
-    #  TO-DO
+    file_zip = service.files().create(body=file_metadata,
+                                      media_body=media,
+                                      fields='id').execute()
+    file_id = file_zip.get('id')
+    return file_id
 
 
 def afh_upload():
@@ -382,5 +449,5 @@ def uploads():
     #  TO-DO
 
 
-parameters()
-make()
+def main():
+    None

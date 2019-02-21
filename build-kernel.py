@@ -104,14 +104,14 @@ def subprocess_run(cmd):
     talk = subproc.communicate()
     exitCode = subproc.returncode
     if exitCode != 0 and verbose is not True:
-        err('An error was detected while running the subprocess:\n'
-            f'cmd: {cmd}\n'
-            f'exit code: {exitCode}\n'
-            f'stdout: {talk[0]}\n'
-            f'stderr: {talk[1]}')  # % exitCode, talk[0], talk[1]))
+        print('An error was detected while running the subprocess:\n'
+              f'cmd: {cmd}\n'
+              f'exit code: {exitCode}\n'
+              f'stdout: {talk[0]}\n'
+              f'stderr: {talk[1]}')  # % exitCode, talk[0], talk[1]))
     elif exitCode != 0 and verbose is True:
-        err('An error was detected while running the subprocess:\n'
-            f'cmd: {cmd}\n')
+        print('An error was detected while running the subprocess:\n'
+              f'cmd: {cmd}\n')
     return talk
 
 
@@ -158,7 +158,6 @@ def err(message):
                 print('Error out of range...')
             print(telegram.reason)
         remove(msgtmp)
-    raise CalledProcessError
 
 
 def kill_subprocess(parent_pid, sig=signal.SIGTERM):

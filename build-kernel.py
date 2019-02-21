@@ -258,7 +258,7 @@ def toolchain():
                          r'perl -pe "s/\(http.*?\)//gs" | '
                          'sed -e "s/  */ /g" -e "s/[[:space:]]*$//" | '
                          'cut -d " " -f-1,6-8)')
-        # stdout=sys.stdout causing subprocess is giving NoneType output
+        # stdout=sys.stdout causing subprocess is giving NoneType output,
         # so we need special case for --verbose if it's True
         output = None
         if verbose is True:
@@ -454,18 +454,33 @@ def GoogleDriveUpload():
 
 
 def afh_upload():
-    None
-    #  TO-DO
+    from ftplib import FTP, all_errors
+
+    password = variables()['afh']
+    finalzip = variables()['finalzip']
+    with FTP('uploads.androidfilehost.com') as ftp:
+        ftp.login('adek', password)
+        try:
+            ftp.storbinary(f'STOR {finalzip}', open(finalzip, 'rb'))
+        except all_errors as e:
+            raise e
+        else:
+            print('Upload success...')
+            return True
 
 
 def uploads():
-    None
-    #  TO-DO
+    cpuquiet = parameters()['cpuquiet']
+    finalzip = variables()['finalzip']
+    if exists(finalzip) and isfile(finalzip):
+        if cpuquiet is False:
+            if afh_upload():
+                print('Creating mirror into GoogleDrive')
+                GoogleDriveUpload()
+        else:
+            GoogleDriveUpload()
 
 
 def main():
-    parameters()
-    make()
-
-
-main()
+    if not exists('Makefile') or not isfile('Makefile'):
+        raise FileNotFoundError('Please run this script inside kernel tree')

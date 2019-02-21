@@ -296,14 +296,14 @@ def make_wrapper():
     gcc32 = toolchain()['gcc32']
     clangopt = toolchain()['clangopt']
     cmd = f'make ARCH=arm64 O="{outdir}" {defconfig}'
-    talk = subprocess_run(cmd)
+    subprocess_run(cmd)
     if cc == 'clang':
         cmd = (f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="{gcc}" '
                f'CROSS_COMPILE_ARM32="{gcc32}" -j4 {clangopt}')
     elif cc == 'gcc':
         cmd = (f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="ccache {gcc}'
                f'CROSS_COMPILE_ARM32="ccache {gcc32}" -j4')
-    talk = subprocess_run(cmd)
+    subprocess_run(cmd)
 
 
 def make():
@@ -315,7 +315,7 @@ def make():
     # In-Into sourcedir and change the branch
     chdir(sourcedir)
     cmd = f'git checkout {branch}'
-    talk = subprocess_run(cmd)
+    subprocess_run(cmd)
     if device == 'mido':
         if oc is False:
             revert_commit = {
@@ -326,7 +326,7 @@ def make():
                 cmd = f'git revert --no-commit {revert_commit[build_type]}'
             elif build_type == 'custom':
                 cmd = f'git revert --no-commit {revert_commit[build_type]}'
-            talk = subprocess_run(cmd)
+            subprocess_run(cmd)
     try:
         make_wrapper()
     except CalledProcessError:
@@ -362,7 +362,7 @@ def modules():
     if build_type == 'miui':
         if exists(outmodule) and isfile(outmodule):
             cmd = f'"{tcstrip}" --strip-unneeded "{outmodule}"'
-            talk = subprocess_run(cmd)
+            subprocess_run(cmd)
             if device == 'whyred':
                 cmd = (f'"{outdir}/scripts/sign-file" sha512 '
                        f'"{outdir}/certs/signing_key.pem" '
@@ -373,7 +373,7 @@ def modules():
                        f'"{outdir}/certs/signing_key.pem" '
                        f'"{outdir}/certs/signing_key.x509" '
                        f'"{outmodule}"')
-            talk = subprocess_run(cmd)
+            subprocess_run(cmd)
             if device == 'whyred':
                 copy(outmodule, join(moduledir, 'qca_cld3/qca_cld3_wlan.ko'))
             elif device == 'mido':

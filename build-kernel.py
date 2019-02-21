@@ -104,14 +104,16 @@ def subprocess_run(cmd):
     talk = subproc.communicate()
     exitCode = subproc.returncode
     if exitCode != 0 and verbose is not True:
-        print('An error was detected while running the subprocess:\n'
-              f'cmd: {cmd}\n'
-              f'exit code: {exitCode}\n'
-              f'stdout: {talk[0]}\n'
-              f'stderr: {talk[1]}')  # % exitCode, talk[0], talk[1]))
+        raise CalledProcessError(cmd, 'An error was detected while '
+                                 'running the subprocess:\n'
+                                 f'cmd: {cmd}\n'
+                                 f'exit code: {exitCode}\n'
+                                 f'stdout: {talk[0]}\n'
+                                 f'stderr: {talk[1]}')
     elif exitCode != 0 and verbose is True:
-        print('An error was detected while running the subprocess:\n'
-              f'cmd: {cmd}\n')
+        raise CalledProcessError(cmd, 'An error was detected while running the'
+                                 ' subprocess:\n'
+                                 f'cmd: {cmd}')
     return talk
 
 
@@ -244,6 +246,7 @@ def toolchain():
     cc = parameters()['cc']
     gcc = join(tcdir, 'google-gcc/bin/aarch64-linux-android-')
     gcc32 = join(tcdir, 'google-gcc-32/bin/arm-linux-androideabi-')
+    verbose = parameters()['verbose']
     if cc == 'clang':
         tcstrip = join(tcdir, 'google-clang/bin/llvm-strip')
     elif cc == 'gcc':
@@ -255,13 +258,22 @@ def toolchain():
                          r'perl -pe "s/\(http.*?\)//gs" | '
                          'sed -e "s/  */ /g" -e "s/[[:space:]]*$//" | '
                          'cut -d " " -f-1,6-8)')
-        cmd = f'echo "{clang_version}"'
-        talk = subprocess_run(cmd)
-        clang_version = talk[0].strip('\n')
+        # stdout=sys.stdout causing subprocess is giving NoneType output
+        # so we need special case for --verbose if it's True
+        if verbose is True:
+            tmp = mkstemp()
+            output = tmp[1]
+            cmd = f'echo "{clang_version}" > {output}'
+            subprocess_run(cmd)
+            clang_version = open(f'{output}').read().strip('\n')
+        else:
+            cmd = f'echo "{clang_version}"'
+            talk = subprocess_run(cmd)
+            clang_version = talk[0].strip('\n')
         clangopt = ' '.join([f'CC="{clangcc}"',
                              'CLANG_TRIPLE="aarch64-linux-gnu-"',
                              'CLANG_TRIPLE_ARM32="arm-linux-gnueabi-"',
-                             'KBUILD_COMPILER_STRING="{clang_version}"'])
+                            f'KBUILD_COMPILER_STRING="{clang_version}"'])
     return {
         'gcc': gcc,
         'gcc32': gcc32,
@@ -319,15 +331,15 @@ def make():
                   ) or exists(join(sourcedir, 'include/config')):
             # Just to make sure config is directory
             if isdir(join(sourcedir, 'include/config')):
-                cmd = 'make mrproper'
                 try:
-                    cmd = 'make mrproper'
-                    talk = subprocess_run(cmd)
+                    print('cleaning...')
+                    cmd = 'make -q mrproper'
+                    subprocess_run(cmd)
                 except CalledProcessError:
                     print('failed when cleaning, exiting...')
-                    return False
+                    raise
                 else:
-                    print('re-run the make again...')
+                    print('re-runing the make again...')
                     make_wrapper()
         else:
             print('failed to make kernel image...')
@@ -449,4 +461,8 @@ def uploads():
 
 
 def main():
-    None
+    parameters()
+    make()
+
+
+main()

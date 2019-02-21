@@ -474,7 +474,7 @@ def uploads():
     finalzip = variables()['finalzip']
     if exists(finalzip) and isfile(finalzip):
         if cpuquiet is False:
-            if afh_upload():
+            if afh_upload() is True:
                 print('Creating mirror into GoogleDrive')
                 GoogleDriveUpload()
         else:
@@ -482,5 +482,7 @@ def uploads():
 
 
 def main():
-    if not exists('Makefile') or not isfile('Makefile'):
+    if not exists('Makefile'):
         raise FileNotFoundError('Please run this script inside kernel tree')
+    elif not isfile('Makefile'):
+        raise IsADirectoryError('Makefile is a directory...')

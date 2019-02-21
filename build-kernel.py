@@ -260,6 +260,7 @@ def toolchain():
                          'cut -d " " -f-1,6-8)')
         # stdout=sys.stdout causing subprocess is giving NoneType output
         # so we need special case for --verbose if it's True
+        output = None
         if verbose is True:
             tmp = mkstemp()
             output = tmp[1]
@@ -274,6 +275,8 @@ def toolchain():
                              'CLANG_TRIPLE="aarch64-linux-gnu-"',
                              'CLANG_TRIPLE_ARM32="arm-linux-gnueabi-"',
                             f'KBUILD_COMPILER_STRING="{clang_version}"'])
+        if output is not None:
+            remove(output)
     return {
         'gcc': gcc,
         'gcc32': gcc32,

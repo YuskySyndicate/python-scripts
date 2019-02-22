@@ -183,16 +183,16 @@ def variables():
     rundir = os.getcwd()
     scriptdir = realpath(sys.argv[0]).split(f'/{sys.argv[0]}')[0]
     kerneldir = join(home, 'kernel')
-    sourcedir = join(kerneldir, f'{device}')
+    sourcedir = join(kerneldir, device)
     anykernel = join(kerneldir, f'anykernel/{device}/{build_type}')
     outdir = join(kerneldir, f'build/out/target/kernel/{device}/{build_type}')
     zipdir = join(kerneldir,
                   f'build/out/target/kernel/zip/{device}/{build_type}')
     image = join(outdir, 'arch/arm64/boot/Image.gz-dtb')
     tcdir = join(kerneldir, 'toolchain')
-    keystore_password = open(home + '/keystore_password', 'r'
+    keystore_password = open(f'{home}/keystore_password', 'r'
                              ).read().splitlines()[0].split('=')[1]
-    afh_password = open(home + '/pass', 'r').read().splitlines()[0]
+    afh_password = open(f'{home}/pass', 'r').read().splitlines()[0]
     if device == 'whyred':
         defconfig = 'whyred_defconfig'
         version = version + '-' + 'MIUI'
@@ -392,44 +392,18 @@ def zip_kernel():
     # TO-DO
 
 
-def GoogleDriveUpload():
+def GoogleDrive_Creds():
     from googleapiclient.discovery import build
-    from googleapiclient.http import MediaFileUpload
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.auth.transport.requests import Request
     import pickle
-
-    device = parameters()['device']
-    zipname = variables()['zipname']
     scriptdir = variables()['scriptdir']
-    finalzip = variables()['finalzip']
-
-    folder_id = {
-        'cpuquiet': '1i5XRVcO3Q8y8OFAOxXU-UWGWmQJiKo2u',
-        'whyred': '1YjsSb1JYqWOANua07kd_UN4q2vPoq1iv',
-        'mido': '1fkEmVBKD0cHMY1kbkpr4Bwm9v3COPPjf'
-    }
-
-    if device == 'whyred':
-        folder_id = folder_id['whyred']
-    elif device == 'mido':
-        folder_id = folder_id['cpuquiet']
-
-    file_metadata = {
-        'name': zipname,
-        'parents': [folder_id]
-    }
-    media = MediaFileUpload(finalzip,
-                            mimetype='application/zip',
-                            resumable=True)
-
     SCOPES = [
         'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/drive.file',
         'https://www.googleapis.com/auth/drive.appdata',
         'https://www.googleapis.com/auth/drive.apps.readonly'
     ]
-
     creds = None
     if exists(join(scriptdir, 'token.pickle')
               ) and isfile(join(scriptdir, 'token.pickle')):
@@ -444,18 +418,71 @@ def GoogleDriveUpload():
             creds = flow.run_local_server()
         with open(join(scriptdir, 'token.pickle'), 'wb') as token:
             pickle.dump(creds, token)
-
     service = build('drive', 'v3', credentials=creds)
-    file_zip = service.files().create(body=file_metadata,
-                                      media_body=media,
-                                      fields='id').execute()
-    file_id = file_zip.get('id')
+    return service
+
+
+def GoogleDrive_checkFolder():
+    service = GoogleDrive_Creds()
+    device = parameters()['device']
+    version = parameters()['version']
+    parents_id = {
+        'cpuquiet': '1i5XRVcO3Q8y8OFAOxXU-UWGWmQJiKo2u',
+        'whyred': '1YjsSb1JYqWOANua07kd_UN4q2vPoq1iv',
+        'mido': '1fkEmVBKD0cHMY1kbkpr4Bwm9v3COPPjf'
+    }
+    if device == 'whyred':
+        parents_id = parents_id['whyred']
+    elif device == 'mido':
+        parents_id = parents_id['cpuquiet']
+    folder_metadata = {
+        'name': version,
+        'parents': [parents_id],
+        'mimeType': 'application/vnd.google-apps.folder'
+    }
+    page_token = None
+    response = service.files().list(q=f"name='{version}'",
+                                    spaces='drive',
+                                    fields=('nextPageToken, '
+                                            'files(parents, name, id)'),
+                                    pageToken=page_token).execute()
+    try:
+        is_exists = response.get('files', [])[0]
+    except IndexError:
+        folder = service.files().create(body=folder_metadata,
+                                        fields='id').execute()
+        folder_id = folder.get('id')
+    else:
+        name = is_exists.get('name')
+        parent = is_exists.get('parents')
+        if name == version and parent == parents_id:
+            folder_id = is_exists.get('id')
+    page_token = response.get('nextPageToken', None)
+    return folder_id
+
+
+def GoogleDrive_Upload():
+    from googleapiclient.http import MediaFileUpload
+    finalzip = variables()['finalzip']
+    folder_id = GoogleDrive_checkFolder()
+    service = GoogleDrive_Creds()
+    zipname = variables()['zipname']
+    file_metadata = {
+        'name': zipname,
+        'parents': [folder_id]
+    }
+    media = MediaFileUpload(finalzip,
+                            mimetype='application/zip',
+                            resumable=True)
+    file = service.files().create(body=file_metadata,
+                                  media_body=media,
+                                  fields='id').execute()
+    file_id = file.get('id')
     return file_id
 
 
 def afh_upload():
     from ftplib import FTP, all_errors
-
     password = variables()['afh']
     finalzip = variables()['finalzip']
     with FTP('uploads.androidfilehost.com') as ftp:
@@ -476,9 +503,9 @@ def uploads():
         if cpuquiet is False:
             if afh_upload() is True:
                 print('Creating mirror into GoogleDrive')
-                GoogleDriveUpload()
+                GoogleDrive_Upload()
         else:
-            GoogleDriveUpload()
+            GoogleDrive_Upload()
 
 
 def main():

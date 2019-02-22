@@ -13,21 +13,21 @@ import signal
 from argparse import ArgumentParser
 from os import listdir
 from os.path import isdir, exists, join
-from subprocess import PIPE, Popen
+from subprocess import PIPE, Popen, CalledProcessError
 
 
 def subprocess_run(cmd):
-    global exitCode
     subproc = Popen(cmd, stdout=PIPE, stderr=PIPE,
                     shell=True, universal_newlines=True)
     subproc.wait()
     talk = subproc.communicate()
     exitCode = subproc.returncode
     if exitCode != 0:
-        print('An error was detected while running the subprocess:\n'
-              'exit code: %d\n'
-              'stdout: %s\n'
-              'stderr: %s' % (exitCode, talk[0], talk[1]))
+        raise CalledProcessError(
+            'An error was detected while running the subprocess:\n'
+            'exit code: %d\n'
+            'stdout: %s\n'
+            'stderr: %s' % (exitCode, talk[0], talk[1]))
     return talk
 
 
@@ -169,8 +169,6 @@ def merge():
             print("fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch %s %s' % (repo_url[repos], tag)
             talk = subprocess_run(cmd)
-            if exitCode != 0:
-                return False
             while True:
                 cmds = [
                     'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd,
@@ -181,8 +179,6 @@ def merge():
                 ]
                 for cmd in cmds:
                     talk = subprocess_run(cmd)
-                    if exitCode != 0:
-                        return False
                     if cmd == cmds[0]:
                         print('merging %s into kernel source...' % repos)
                     if cmd == cmds[2]:
@@ -194,8 +190,6 @@ def merge():
             print("fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch %s %s' % (repo_url[repos], tag)
             talk = subprocess_run(cmd)
-            if exitCode != 0:
-                return False
             while True:
                 print('merging %s into kernel source and committing changes...'
                       % repos)
@@ -205,8 +199,6 @@ def merge():
                        'FETCH_HEAD --no-edit'
                        % (repos, repos, tag))
                 talk = subprocess_run(cmd)
-                if exitCode != 0:
-                    return False
                 print('\n' + talk[0])
                 break
     elif wlan_type == 'prima' and merge_type == 'initial':
@@ -220,8 +212,6 @@ def merge():
         ]
         for cmd in cmds:
             talk = subprocess_run(cmd)
-            if exitCode != 0:
-                return False
             if cmd == cmds[0]:
                 print("fetching %s with tag '%s'" % (wlan_type, tag))
             if cmd == cmds[1]:
@@ -240,8 +230,6 @@ def merge():
         ]
         for cmd in cmds:
             talk = subprocess_run(cmd)
-            if exitCode != 0:
-                return False
             if cmd == cmds[0]:
                 print("fetching %s with tag '%s'" % (wlan_type, tag))
             if cmd == cmds[1]:

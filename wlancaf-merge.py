@@ -23,12 +23,11 @@ def subprocess_run(cmd):
     talk = subproc.communicate()
     exitCode = subproc.returncode
     if exitCode != 0:
-        raise CalledProcessError(
-            cmd, 'An error was detected while running the subprocess:\n'
-                 'cmd: %s\n'
-                 'exit code: %d\n'
-                 'stdout: %s\n'
-                 'stderr: %s' % (cmd, exitCode, talk[0], talk[1]))
+        print('An error was detected while running the subprocess:\n'
+              'exit code: %d\n'
+              'stdout: %s\n'
+              'stderr: %s' % (exitCode, talk[0], talk[1]))
+        raise CalledProcessError(exitCode, cmd)
     return talk
 
 

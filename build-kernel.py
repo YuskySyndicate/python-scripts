@@ -104,16 +104,15 @@ def subprocess_run(cmd):
     talk = subproc.communicate()
     exitCode = subproc.returncode
     if exitCode != 0 and verbose is not True:
-        raise CalledProcessError(
-            cmd, 'An error was detected while running the subprocess:\n'
-                 f'cmd: {cmd}\n'
-                 f'exit code: {exitCode}\n'
-                 f'stdout: {talk[0]}\n'
-                 f'stderr: {talk[1]}')
+        print('An error was detected while running the subprocess:\n'
+              f'exit code: {exitCode}\n'
+              f'stdout: {talk[0]}\n'
+              f'stderr: {talk[1]}')
+        raise CalledProcessError(exitCode, cmd)
     elif exitCode != 0 and verbose is True:
-        raise CalledProcessError(
-            cmd, 'An error was detected while running the subprocess:\n'
-                 f'cmd: {cmd}')
+        # using sys.stdout/sys.stderr in Popen stdout/stderr
+        # makes subproc.communicate() exit with NoneType status
+        raise CalledProcessError(exitCode, cmd)
     return talk
 
 
@@ -346,7 +345,7 @@ def make_wrapper():
                     make()
         else:
             print('failed to make kernel image...')
-            return False
+            raise
     else:
         print('Successfully built...')
 

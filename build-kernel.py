@@ -9,6 +9,7 @@ import psutil
 from datetime import datetime
 from argparse import ArgumentParser
 from subprocess import Popen, PIPE, CalledProcessError
+from threading import Thread
 from os import remove, chdir
 from os.path import exists, isfile, expanduser, join, realpath, isdir
 from shutil import copy2 as copy
@@ -335,7 +336,7 @@ def make_wrapper():
             if isdir(join(sourcedir, 'include/config')):
                 try:
                     print('cleaning...')
-                    cmd = 'make -q mrproper'
+                    cmd = 'make mrproper'
                     subprocess_run(cmd)
                 except CalledProcessError:
                     print('failed when cleaning, exiting...')
@@ -351,16 +352,20 @@ def make_wrapper():
 
 
 def modules():
+    cc = parameters()['cc']
     build_type = parameters()['type']
     device = parameters()['device']
     moduledir = variables()['moduledir']
     outdir = variables()['outdir']
-    outmodule = variables()['outmodules']
+    outmodule = variables()['outmodule']
     srcdir = variables()['sourcedir']
     tcstrip = toolchain()['strip']
     if build_type == 'miui':
         if exists(outmodule) and isfile(outmodule):
-            cmd = f'"{tcstrip}" --strip-unneeded "{outmodule}"'
+            if cc == 'clang':
+                cmd = f'"{tcstrip}" --strip-debug "{outmodule}"'
+            elif cc == 'gcc':
+                cmd = f'"{tcstrip}" --strip-unneeded "{outmodule}"'
             subprocess_run(cmd)
             if device == 'whyred':
                 cmd = (f'"{outdir}/scripts/sign-file" sha512 '
@@ -385,9 +390,13 @@ def modules():
 
 def zip_kernel():
     anykernel = variables()['anykernel']
+    image = variables()['image']
     name = variables()['name']
     rundir = variables()['rundir']
     zipdir = variables()['zipdir']
+    if exists(image) and isfile(image):
+        copy(image, anykernel)
+    modules()
     # TO-DO
 
 
@@ -512,3 +521,11 @@ def main():
         raise FileNotFoundError('Please run this script inside kernel tree')
     elif not isfile('Makefile'):
         raise IsADirectoryError('Makefile is a directory...')
+    parameters()
+    P = Thread(target=make_wrapper)
+    P.start()
+    P.join()
+
+
+if __name__ == '__main__':
+    main()

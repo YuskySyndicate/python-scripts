@@ -117,51 +117,6 @@ def subprocess_run(cmd):
     return talk
 
 
-def err(message):
-    print(message)
-    telegram = parameters()['telegram']
-    home = variables()['home']
-    verbose = parameters()['verbose']
-    if telegram is True:
-        from requests import post
-        tg_chat = '-1001354431412'
-        token = open(home + '/token', 'r').read().splitlines()[0]
-        tmp = mkstemp()
-        msgtmp = tmp[1]
-        with open(msgtmp, 'w', newline='\n') as t:
-            t.write('```')
-            t.writelines('\n')
-            t.write('Error found while running:')
-            t.writelines('\n' + '\n')
-            t.write(' '.join(sys.argv[0:]))
-            t.writelines('\n' + '\n')
-            t.write(f'{message}')
-            t.writelines('\n')
-            t.write('```')
-        with open(msgtmp, 'r') as t:
-            messages = (
-                ('chat_id', tg_chat),
-                ('text', t.read()),
-                ('parse_mode', 'Markdown'),
-                ('disable_notification', 'no'),
-                ('disable_web_page_preview', 'yes')
-            )
-        tg = 'https://api.telegram.org/bot' + token + '/sendMessage'
-        telegram = post(tg, params=messages)
-        if verbose is True:
-            print()
-            if telegram.status_code == 200:
-                print('Messages sent...')
-            elif telegram.status_code == 400:
-                print('Bad recipient / Wrong text format...')
-            elif telegram.status_code == 401:
-                print('Wrong / Unauth token...')
-            else:
-                print('Error out of range...')
-            print(telegram.reason)
-        remove(msgtmp)
-
-
 def kill_subprocess(parent_pid, sig=signal.SIGTERM):
     try:
         parent = psutil.Process(parent_pid)

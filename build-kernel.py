@@ -14,15 +14,9 @@ from os import remove, chdir
 from os.path import exists, isfile, expanduser, join, realpath, isdir, dirname
 from shutil import copy2 as copy
 from tempfile import mkstemp
-
-
-def dt():
-    startTime = datetime.now()
-    date_time = datetime.now().strftime('%Y%m%d-%H%M')
-    return {
-        'date-version': date_time,
-        'start': startTime
-    }
+from time import time
+start = time()
+date_time = datetime.now().strftime('%Y%m%d-%H%M')
 
 
 def parameters():
@@ -133,7 +127,6 @@ def variables():
     version = parameters()['version']
     oc = parameters()['overclock']
     cpuquiet = parameters()['cpuquiet']
-    date_time = dt()['date-version']
     home = expanduser('~')
     rundir = os.getcwd()
     scriptdir = dirname(realpath(sys.argv[0]))
@@ -480,6 +473,22 @@ def main():
     P = Thread(target=make_wrapper)
     P.start()
     P.join()
+    end = time()
+    result = str(round((end - start) / 60, 2)).split('.')
+    minutes = int(result[0])
+    seconds = int(result[1])
+    if seconds >= 60:
+        minutes = minutes + 1
+        seconds = seconds - 60
+    if minutes <= 1:
+        m_msg = 'minute'
+    else:
+        m_msg = 'minutes'
+    if seconds <= 1:
+        s_msg = 'second'
+    else:
+        s_msg = 'seconds'
+    print(f'--- build took {minutes} {m_msg}, and {seconds} {s_msg} ---')
 
 
 if __name__ == '__main__':

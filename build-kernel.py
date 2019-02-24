@@ -480,31 +480,66 @@ def GoogleDrive_Upload():
 def afh_upload():
     from ftplib import FTP, all_errors
     password = variables()['afh']
-    finalzip = variables()['finalzip']
+    rundir = variables()['rundir']
+    zipdir = variables()['zipdir']
+    zipname = variables()['zipname']
+    os.chdir(zipdir)
+    print('Uploading to androidfilehost...')
     with FTP('uploads.androidfilehost.com') as ftp:
         ftp.login('adek', password)
         try:
-            ftp.storbinary(f'STOR {finalzip}', open(finalzip, 'rb'))
+            ftp.storbinary(f'STOR {zipname}', open(zipname, 'rb'))
         except all_errors as e:
             raise e
         else:
             print('Upload success...')
-            return True
+    os.chdir(rundir)
 
 
 def uploads():
     cpuquiet = parameters()['cpuquiet']
     finalzip = variables()['finalzip']
+    home = variables()['home']
+    release = parameters()['release']
+    telegram = parameters()['telegram']
+    zipname = variables()['zipname']
     if exists(finalzip) and isfile(finalzip):
         if cpuquiet is False:
-            if afh_upload() is True:
+            if release is True:
+                afh_upload()
                 print('Creating mirror into GoogleDrive')
-                GoogleDrive_Upload()
+                file_id = GoogleDrive_Upload()
         else:
-            GoogleDrive_Upload()
+            file_id = GoogleDrive_Upload()
+            download_url = ('https://drive.google.com/'
+                            f'uc?id={file_id}&export=download')
+            if telegram is True:
+                from requests import post
+                md5 = finalzip_md5sum()
+                tg_chat = '-1001354431412'
+                token = open(f'{home}/token', 'r').read().splitlines()[0]
+                tmp = mkstemp()
+                msgtmp = tmp[1]
+                with open(msgtmp, 'r+', newline='\n') as msg:
+                    msg.write('Build - Stormguard | CPUQuiet:')
+                    msg.write('\n')
+                    msg.write(f'[{zipname}]({download_url})')
+                    msg.writelines('\n' + '\n')
+                    msg.write(f'md5: `{md5}`')
+                    messages = (
+                        ('chat_id', tg_chat),
+                        ('text', msg.read()),
+                        ('parse_mode', 'Markdown'),
+                        ('disable_notification', 'no'),
+                        ('disable_web_page_preview', 'yes')
+                    )
+                tg = 'https://api.telegram.org/bot' + token + '/sendMessage'
+                telegram = post(tg, params=messages)
+                remove(msgtmp)
 
 
 def main():
+    upload = parameters()['upload']
     if not exists('Makefile'):
         raise FileNotFoundError('Please run this script inside kernel tree')
     elif not isfile('Makefile'):
@@ -530,6 +565,8 @@ def main():
         s_msg = 'seconds'
     print(f'--- build took {minutes} {m_msg}, and {seconds} {s_msg} ---')
     zip_now()
+    if upload is True:
+        uploads()
 
 
 if __name__ == '__main__':

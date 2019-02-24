@@ -336,16 +336,56 @@ def modules():
             raise FileNotFoundError(f'{outmodule} not found...')
 
 
-def zip_kernel():
+def zip_now():
+    from zipfile import ZipFile
     anykernel = variables()['anykernel']
+    device = parameters()['device']
     image = variables()['image']
-    name = variables()['name']
+    finalzip = variables()['finalzip']
+    moduledir = variables()['moduledir']
     rundir = variables()['rundir']
-    zipdir = variables()['zipdir']
+    os.chdir(anykernel)
+    # { delete old Image and Modules
+    if exists('Image.gz-dtb'):
+        remove('Image.gz-dtb')
+    if device == 'whyred':
+        if exists(join(moduledir, 'qca_cld3/qca_cld3_wlan.ko')):
+            remove(join(moduledir, 'qca_cld3/qca_cld3_wlan.ko'))
+    elif device == 'mido':
+        if exists(join(moduledir, 'qca_cld3/qca_cld3_wlan.ko')):
+            remove(join(moduledir, 'pronto/pronto_wlan.ko'))
+    # }
     if exists(image) and isfile(image):
         copy(image, anykernel)
     modules()
-    # TO-DO
+    zip_anykernel = ZipFile(finalzip, 'w')
+    with zip_anykernel as ak:
+        for root, directories, files in os.walk('.'):
+            files = [f for f in files if not f[0] == '.']
+            directories[:] = [d for d in directories if not d[0] == '.']
+            for filename in files:
+                ak.write(join(root, filename))
+            # also write empty folder too
+            for dirnames in directories:
+                ak.write(join(root, dirnames))
+    os.chdir(rundir)
+
+
+def finalzip_md5sum():
+    finalzip = variables()['finalzip']
+    verbose = parameters()['verbose']
+    if verbose is not True:
+        cmd = f'md5sum "{finalzip}" | cut -d " " -f1'
+        talk = subprocess_run(cmd)
+        md5 = talk[0].strip('\n')
+    else:
+        tmp = mkstemp()
+        output = tmp[1]
+        cmd = f'md5sum "{finalzip}" | cut -d " " -f1 > {output}'
+        subprocess_run(cmd)
+        md5 = open(f'{output}').read().strip('\n')
+        remove(output)
+    return md5
 
 
 def GoogleDrive_Creds():
@@ -489,6 +529,7 @@ def main():
     else:
         s_msg = 'seconds'
     print(f'--- build took {minutes} {m_msg}, and {seconds} {s_msg} ---')
+    zip_now()
 
 
 if __name__ == '__main__':

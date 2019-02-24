@@ -283,20 +283,22 @@ def make_wrapper():
             # Just to make sure config is directory
             if isdir(join(sourcedir, 'include/config')):
                 try:
-                    print('cleaning...')
+                    print('=== cleaning... ===')
                     cmd = 'make mrproper'
                     subprocess_run(cmd)
                 except CalledProcessError:
-                    print('failed when cleaning, exiting...')
+                    print('!!! failed when cleaning, exiting... !!!')
                     raise
                 else:
-                    print('re-runing the make again...')
+                    print('=== re-runing the make again... ===')
                     make()
         else:
-            print('failed to make kernel image...')
+            print('!!! failed to make kernel image... !!!')
             raise
     else:
-        print('Successfully built...')
+        print()
+        print('--- Successfully built... ---')
+        print()
 
 
 def modules():
@@ -333,7 +335,7 @@ def modules():
                 copy(join(moduledir, 'wlan.ko'
                           ), join(moduledir, 'pronto/pronto_wlan.ko'))
         else:
-            raise FileNotFoundError(f'{outmodule} not found...')
+            raise FileNotFoundError(f'!!! module not found... !!!')
 
 
 def zip_now():
@@ -343,8 +345,22 @@ def zip_now():
     image = variables()['image']
     finalzip = variables()['finalzip']
     moduledir = variables()['moduledir']
+    release = parameters()['release']
     rundir = variables()['rundir']
+    upload = parameters()['upload']
+    version = parameters()['version']
     os.chdir(anykernel)
+    if release is True and upload is True:
+        with open('banner', 'w', newline='\n') as banner:
+            banner.write('        ____       ____ ')
+            banner.write('\n')
+            banner.write('       / ___|     / ___|')
+            banner.write('\n')
+            banner.write(r'       \___ \    | |  _ ')
+            banner.write('\n')
+            banner.write(f'        ___) |{version}| |_| |')
+            banner.write('\n')
+            banner.write(r'       |____/torm \____|uard')
     # { delete old Image and Modules
     if exists('Image.gz-dtb'):
         remove('Image.gz-dtb')
@@ -368,7 +384,26 @@ def zip_now():
             # also write empty folder too
             for dirnames in directories:
                 ak.write(join(root, dirnames))
+    # Remove created banner
+    remove('banner')
     os.chdir(rundir)
+
+
+# haven't got some idea to sign via python directly without subprocess
+def finalzip_sign():
+    finalzip = variables()['finalzip']
+    keystore_password = variables()['keystore']
+    scriptdir = variables()['scriptdir']
+    if exists(finalzip):
+        keystore = join(scriptdir, 'bin/stormguard.keystore')
+        cmd = (
+            f'echo "{keystore_password}" | '
+            f'jarsigner -keystore {keystore} '
+            f'"{finalzip}" stormguard'
+        )
+        subprocess_run(cmd)
+    else:
+        raise FileNotFoundError
 
 
 def finalzip_md5sum():
@@ -422,6 +457,7 @@ def GoogleDrive_checkFolder():
     service = GoogleDrive_Creds()
     device = parameters()['device']
     version = parameters()['version']
+    print(' -> Checking folder...')
     parents_id = {
         'cpuquiet': '1i5XRVcO3Q8y8OFAOxXU-UWGWmQJiKo2u',
         'whyred': '1YjsSb1JYqWOANua07kd_UN4q2vPoq1iv',
@@ -445,10 +481,12 @@ def GoogleDrive_checkFolder():
     try:
         is_exists = response.get('files', [])[0]
     except IndexError:
+        print('    folder not exists, creating one...')
         folder = service.files().create(body=folder_metadata,
                                         fields='id').execute()
         folder_id = folder.get('id')
     else:
+        print('    folder exists, using it as parent...')
         name = is_exists.get('name')
         parent = is_exists.get('parents')
         if name == version and parent == parents_id:
@@ -461,6 +499,7 @@ def GoogleDrive_Upload():
     from googleapiclient.http import MediaFileUpload
     finalzip = variables()['finalzip']
     folder_id = GoogleDrive_checkFolder()
+    print(' -> Uploading to GoogleDrive...')
     service = GoogleDrive_Creds()
     zipname = variables()['zipname']
     file_metadata = {
@@ -478,21 +517,20 @@ def GoogleDrive_Upload():
 
 
 def afh_upload():
-    from ftplib import FTP, all_errors
+    from ftplib import FTP
     password = variables()['afh']
     rundir = variables()['rundir']
     zipdir = variables()['zipdir']
     zipname = variables()['zipname']
     os.chdir(zipdir)
-    print('Uploading to androidfilehost...')
     with FTP('uploads.androidfilehost.com') as ftp:
         ftp.login('adek', password)
         try:
             ftp.storbinary(f'STOR {zipname}', open(zipname, 'rb'))
-        except all_errors as e:
-            raise e
-        else:
-            print('Upload success...')
+        except ConnectionResetError:
+            ftp.delete(zipname)
+            print('!!! deleting uploaded file... !!!')
+            raise
     os.chdir(rundir)
 
 
@@ -507,7 +545,7 @@ def uploads():
         if cpuquiet is False:
             if release is True:
                 afh_upload()
-                print('Creating mirror into GoogleDrive')
+                print(' -> Creating mirror into GoogleDrive...')
                 file_id = GoogleDrive_Upload()
         else:
             file_id = GoogleDrive_Upload()
@@ -557,16 +595,24 @@ def main():
         seconds = seconds - 60
     if minutes <= 1:
         m_msg = 'minute'
+        h = '==========================================='
     else:
         m_msg = 'minutes'
+        h = '============================================'
     if seconds <= 1:
         s_msg = 'second'
     else:
         s_msg = 'seconds'
+    print(h)
     print(f'--- build took {minutes} {m_msg}, and {seconds} {s_msg} ---')
+    print(h)
+    print()
     zip_now()
+    finalzip_sign()
     if upload is True:
+        print('==> Uploading...')
         uploads()
+        print('==> Upload success...')
 
 
 if __name__ == '__main__':

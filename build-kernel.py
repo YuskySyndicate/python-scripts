@@ -11,7 +11,7 @@ from argparse import ArgumentParser
 from subprocess import Popen, PIPE, CalledProcessError
 from threading import Thread
 from os import remove, chdir
-from os.path import exists, isfile, expanduser, join, realpath, isdir
+from os.path import exists, isfile, expanduser, join, realpath, isdir, dirname
 from shutil import copy2 as copy
 from tempfile import mkstemp
 
@@ -181,7 +181,7 @@ def variables():
     date_time = dt()['date-version']
     home = expanduser('~')
     rundir = os.getcwd()
-    scriptdir = realpath(sys.argv[0]).split(f'/{sys.argv[0]}')[0]
+    scriptdir = dirname(realpath(sys.argv[0]))
     kerneldir = join(home, 'kernel')
     sourcedir = join(kerneldir, device)
     anykernel = join(kerneldir, f'anykernel/{device}/{build_type}')

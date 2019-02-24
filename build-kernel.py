@@ -337,7 +337,7 @@ def modules():
 
 
 def zip_now():
-    from zipfile import ZipFile
+    from zipfile import ZipFile, ZIP_DEFLATED
     anykernel = variables()['anykernel']
     device = parameters()['device']
     image = variables()['image']
@@ -358,7 +358,7 @@ def zip_now():
     if exists(image) and isfile(image):
         copy(image, anykernel)
     modules()
-    zip_anykernel = ZipFile(finalzip, 'w')
+    zip_anykernel = ZipFile(finalzip, 'w', ZIP_DEFLATED)
     with zip_anykernel as ak:
         for root, directories, files in os.walk('.'):
             files = [f for f in files if not f[0] == '.']

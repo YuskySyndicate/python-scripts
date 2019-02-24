@@ -265,6 +265,8 @@ def make_wrapper():
     cmd = f'git checkout {branch}'
     subprocess_run(cmd)
     if device == 'mido':
+        cmd = 'git reset --hard'
+        subprocess_run(cmd)
         if oc is False:
             revert_commit = {
                 'custom': 'None',  # Haven't have time to rebase PIE
@@ -491,7 +493,7 @@ def GoogleDrive_checkFolder():
     else:
         print('    folder exists, using it as parent...')
         name = is_exists.get('name')
-        parent = is_exists.get('parents')
+        parent = is_exists.get('parents')[0]
         if name == version and parent == parents_id:
             folder_id = is_exists.get('id')
     page_token = response.get('nextPageToken', None)
@@ -543,6 +545,7 @@ def uploads():
     home = variables()['home']
     release = parameters()['release']
     telegram = parameters()['telegram']
+    verbose = parameters()['verbose']
     zipname = variables()['zipname']
     if exists(finalzip) and isfile(finalzip):
         if cpuquiet is False:
@@ -561,12 +564,13 @@ def uploads():
                 token = open(f'{home}/token', 'r').read().splitlines()[0]
                 tmp = mkstemp()
                 msgtmp = tmp[1]
-                with open(msgtmp, 'r+', newline='\n') as msg:
+                with open(msgtmp, 'w', newline='\n') as msg:
                     msg.write('Build - Stormguard | CPUQuiet:')
                     msg.write('\n')
                     msg.write(f'[{zipname}]({download_url})')
                     msg.writelines('\n' + '\n')
                     msg.write(f'md5: `{md5}`')
+                with open(msgtmp, 'r') as msg:
                     messages = (
                         ('chat_id', tg_chat),
                         ('text', msg.read()),
@@ -576,10 +580,21 @@ def uploads():
                     )
                 tg = 'https://api.telegram.org/bot' + token + '/sendMessage'
                 telegram = post(tg, params=messages)
+                if verbose is True:
+                    if telegram.status_code == 200:
+                        print('Messages sent...')
+                    elif telegram.status_code == 400:
+                        print('Bad recipient / Wrong text format...')
+                    elif telegram.status_code == 401:
+                        print('Wrong / Unauth token...')
+                    else:
+                        print('Error out of range...')
+                print(telegram.reason)
                 remove(msgtmp)
 
 
 def main():
+    device = parameters()['device']
     upload = parameters()['upload']
     if not exists('Makefile'):
         raise FileNotFoundError('Please run this script inside kernel tree')
@@ -616,6 +631,9 @@ def main():
         print('==> Uploading...')
         uploads()
         print('==> Upload success...')
+    if device == 'mido':
+        cmd = 'git reset --hard'
+        subprocess_run(cmd)
 
 
 if __name__ == '__main__':

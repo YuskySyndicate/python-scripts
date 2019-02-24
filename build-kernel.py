@@ -293,6 +293,9 @@ def make_wrapper():
                     print('=== re-runing the make again... ===')
                     make()
         else:
+            if device == 'mido':
+                cmd = 'git reset --hard'
+                subprocess_run(cmd)
             print('!!! failed to make kernel image... !!!')
             raise
     else:
@@ -324,8 +327,8 @@ def modules():
                        f'"{outmodule}"')
             elif device == 'mido':
                 cmd = (f'"{srcdir}/scripts/sign-file" sha512 '
-                       f'"{outdir}/certs/signing_key.pem" '
-                       f'"{outdir}/certs/signing_key.x509" '
+                       f'"{outdir}/signing_key.priv" '
+                       f'"{outdir}/signing_key.x509" '
                        f'"{outmodule}"')
             subprocess_run(cmd)
             if device == 'whyred':

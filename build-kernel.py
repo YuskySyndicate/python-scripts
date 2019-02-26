@@ -27,20 +27,14 @@ def parameters():
     param.add_argument('-d', '--device',
                        choices=['mido', 'whyred'], required=True)
     param.add_argument('-o', '--overclock',
-                       help='use this flag to enable overclock',
                        action='store_true')
     param.add_argument('-r', '--release',
-                       help='use this flag to enable release build',
                        action='store_true')
     param.add_argument('-t', '--telegram',
-                       help='use this flag to enable telegram report',
                        action='store_true')
     param.add_argument('-u', '--upload',
-                       help='use this flag to upload the build',
                        action='store_true')
     param.add_argument('--verbose',
-                       help='choose output of stdout and stderr, PIPE'
-                            'or realtime output',
                        action='store_true')
     param.add_argument('-v', '--version', required=True)
     param.add_argument('-cc', '--cc', choices=['clang', 'gcc'], required=True)
@@ -58,18 +52,21 @@ def parameters():
     # Check whyred ENV
     if device == 'whyred':
         # Let's fail all of this if depencies are met, because i'm stupid.
-        if True in [cpuquiet, oc, build_type]:
-            param.error('\n'
-                        '[-c/--cpuquiet, -o/--overclock, -b/--build = custom]'
-                        ', is not available for whyred')
+        if True in [cpuquiet, oc, build_type == 'custom']:
+            param.error(
+                '\n'
+                '[-c/--cpuquiet, -o/--overclock, -b/--build = custom], '
+                "isn't available for whyred"
+            )
     elif device == 'mido':
         if cpuquiet is False:
-            param.error('mido already drop support for non-cpuquiet,\n'
-                        'default now is using it.')
+            param.error('mido already drop support for non-cpuquiet')
     # Fail build if using version beta|test|personal while using --release
     if version in ['beta' or 'test' or 'personal'] and release is True:
-        param.error('version beta|test|personal, '
-                    'can not be passed with --release')
+        param.error(
+            'version beta|test|personal, '
+            "can't be passed with --release"
+        )
     return {
         'type': build_type,
         'cpuquiet': cpuquiet,
@@ -99,10 +96,12 @@ def subprocess_run(cmd):
     talk = subproc.communicate()
     exitCode = subproc.returncode
     if exitCode != 0 and verbose is not True:
-        print('An error was detected while running the subprocess:\n'
-              f'exit code: {exitCode}\n'
-              f'stdout: {talk[0]}\n'
-              f'stderr: {talk[1]}')
+        print(
+            'An error was detected while running the subprocess:\n'
+            f'exit code: {exitCode}\n'
+            f'stdout: {talk[0]}\n'
+            f'stderr: {talk[1]}'
+        )
         raise CalledProcessError(exitCode, cmd)
     elif exitCode != 0 and verbose is True:
         # using sys.stdout/sys.stderr in Popen stdout/stderr
@@ -134,8 +133,10 @@ def variables():
     sourcedir = join(kerneldir, device)
     anykernel = join(kerneldir, f'anykernel/{device}/{build_type}')
     outdir = join(kerneldir, f'build/out/target/kernel/{device}/{build_type}')
-    zipdir = join(kerneldir,
-                  f'build/out/target/kernel/zip/{device}/{build_type}')
+    zipdir = join(
+        kerneldir,
+        f'build/out/target/kernel/zip/{device}/{build_type}'
+    )
     image = join(outdir, 'arch/arm64/boot/Image.gz-dtb')
     tcdir = join(kerneldir, 'toolchain')
     keystore_password = open(f'{home}/keystore_password', 'r'
@@ -202,10 +203,12 @@ def toolchain():
     if cc == 'clang':
         clang = join(tcdir, 'google-clang/bin/clang')
         clangcc = ' '.join(['ccache', clang])
-        clang_version = (f'$({clang} --version | head -n 1 | '
-                         r'perl -pe "s/\(http.*?\)//gs" | '
-                         'sed -e "s/  */ /g" -e "s/[[:space:]]*$//" | '
-                         'cut -d " " -f-1,6-8)')
+        clang_version = (
+            f'$({clang} --version | head -n 1 | '
+            r'perl -pe "s/\(http.*?\)//gs" | '
+            'sed -e "s/  */ /g" -e "s/[[:space:]]*$//" | '
+            'cut -d " " -f-1,6-8)'
+        )
         # stdout=sys.stdout causing subprocess is giving NoneType output,
         # so we need special case for --verbose if it's True
         output = None
@@ -219,10 +222,12 @@ def toolchain():
             cmd = f'echo "{clang_version}"'
             talk = subprocess_run(cmd)
             clang_version = talk[0].strip('\n')
-        clangopt = ' '.join([f'CC="{clangcc}"',
-                             'CLANG_TRIPLE="aarch64-linux-gnu-"',
-                             'CLANG_TRIPLE_ARM32="arm-linux-gnueabi-"',
-                            f'KBUILD_COMPILER_STRING="{clang_version}"'])
+        clangopt = ' '.join([
+            f'CC="{clangcc}"',
+            'CLANG_TRIPLE="aarch64-linux-gnu-"',
+            'CLANG_TRIPLE_ARM32="arm-linux-gnueabi-"',
+            f'KBUILD_COMPILER_STRING="{clang_version}"'
+        ])
         if output is not None:
             remove(output)
     return {
@@ -246,11 +251,15 @@ def make():
     cmd = f'make ARCH=arm64 O="{outdir}" {defconfig}'
     subprocess_run(cmd)
     if cc == 'clang':
-        cmd = (f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="{gcc}" '
-               f'CROSS_COMPILE_ARM32="{gcc32}" -j4 {clangopt}')
+        cmd = (
+            f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="{gcc}" '
+            f'CROSS_COMPILE_ARM32="{gcc32}" -j4 {clangopt}'
+        )
     elif cc == 'gcc':
-        cmd = (f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="ccache {gcc}'
-               f'CROSS_COMPILE_ARM32="ccache {gcc32}" -j4')
+        cmd = (
+            f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="ccache {gcc}'
+            f'CROSS_COMPILE_ARM32="ccache {gcc32}" -j4'
+        )
     subprocess_run(cmd)
 
 
@@ -340,7 +349,7 @@ def modules():
                 copy(join(moduledir, 'wlan.ko'
                           ), join(moduledir, 'pronto/pronto_wlan.ko'))
         else:
-            raise FileNotFoundError(f'!!! module not found... !!!')
+            raise FileNotFoundError('!!! module not found... !!!')
 
 
 def zip_now():
@@ -478,17 +487,23 @@ def GoogleDrive_checkFolder():
         'mimeType': 'application/vnd.google-apps.folder'
     }
     page_token = None
-    response = service.files().list(q=f"name='{version}'",
-                                    spaces='drive',
-                                    fields=('nextPageToken, '
-                                            'files(parents, name, id)'),
-                                    pageToken=page_token).execute()
+    response = service.files().list(
+        q=f"name='{version}'",
+        spaces='drive',
+        fields=(
+            'nextPageToken, '
+            'files(parents, name, id)'
+        ),
+        pageToken=page_token
+    ).execute()
     try:
         is_exists = response.get('files', [])[0]
     except IndexError:
         print('    folder not exists, creating one...')
-        folder = service.files().create(body=folder_metadata,
-                                        fields='id').execute()
+        folder = service.files().create(
+            body=folder_metadata,
+            fields='id'
+        ).execute()
         folder_id = folder.get('id')
     else:
         print('    folder exists, using it as parent...')
@@ -511,12 +526,16 @@ def GoogleDrive_Upload():
         'name': zipname,
         'parents': [folder_id]
     }
-    media = MediaFileUpload(finalzip,
-                            mimetype='application/zip',
-                            resumable=True)
-    file = service.files().create(body=file_metadata,
-                                  media_body=media,
-                                  fields='id').execute()
+    media = MediaFileUpload(
+        finalzip,
+        mimetype='application/zip',
+        resumable=True
+    )
+    file = service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields='id'
+    ).execute()
     file_id = file.get('id')
     return file_id
 
@@ -555,8 +574,10 @@ def uploads():
                 file_id = GoogleDrive_Upload()
         else:
             file_id = GoogleDrive_Upload()
-            download_url = ('https://drive.google.com/'
-                            f'uc?id={file_id}&export=download')
+            download_url = (
+                'https://drive.google.com/'
+                f'uc?id={file_id}&export=download'
+            )
             if telegram is True:
                 from requests import post
                 md5 = finalzip_md5sum()

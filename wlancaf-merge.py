@@ -7,7 +7,6 @@
 
 from __future__ import print_function
 
-import sys
 import psutil
 import signal
 from argparse import ArgumentParser
@@ -50,11 +49,6 @@ def git_env():
     if major_version >= 2 and sub_version >= 9:
         extra_cmd = '--allow-unrelated-histories'
     return extra_cmd
-
-
-def err(message):
-    print('\n' + message)
-    sys.exit(1)
 
 
 def parameters():
@@ -102,8 +96,7 @@ def check():
     repo_url, staging, subdir = repo()
     if wlan_type == 'qcacld' and merge_type == 'initial':
         for subdirs in subdir:
-            if exists(join(staging, subdirs)
-                      ) and isdir(join(staging, subdirs)):
+            if isdir(join(staging, subdirs)):
                 if listdir(join(staging, subdirs)):
                     print('%s exist and not empty' % subdirs)
                     continue
@@ -117,13 +110,14 @@ def check():
             else:
                 return True
         else:
-            err('you might want to use --init initial, '
+            raise OSError(
+                'you might want to use --init initial, '
                 'because those 3 are exists, '
-                '\nor one of them is exist and not empty.')
+                '\nor one of them is exist and not empty.'
+            )
     elif wlan_type == 'qcacld' and merge_type == 'update':
         for subdirs in subdir:
-            if exists(join(staging, subdirs)
-                      ) and isdir(join(staging, subdirs)):
+            if isdir(join(staging, subdirs)):
                 if not listdir(join(staging, subdirs)):
                     print('%s exist and empty' % subdirs)
                     continue
@@ -137,27 +131,35 @@ def check():
             else:
                 continue
         else:
-            err('you might want to use --init update, '
+            raise OSError(
+                'you might want to use --init update, '
                 'because those 3 are not exists.'
-                '\nor exists but one of them has an empty folder.')
+                '\nor exists but one of them has an empty folder.'
+            )
     elif wlan_type == 'prima' and merge_type == 'initial':
-        if exists(join(staging, subdir)) and isdir(join(staging, subdir)):
+        if isdir(join(staging, subdir)):
             if listdir(join(staging, subdir)):
-                err('you might want to use --init update, '
-                    '\nbecause prima is exist and it is not empty.')
+                raise OSError(
+                    'you might want to use --init update, '
+                    '\nbecause prima is exist and it is not empty.'
+                )
             else:
                 return True
         else:
             return True
     elif wlan_type == 'prima' and merge_type == 'update':
-        if exists(join(staging, subdir)) and isdir(join(staging, subdir)):
+        if isdir(join(staging, subdir)):
             if listdir(join(staging, subdir)):
                 return True
             else:
-                err('folder prima exist, but it is just an empty folder.')
+                raise OSError(
+                    'folder prima exist, but it is just an empty folder.'
+                )
         else:
-            err('you might want to use --init initial, '
-                'because prima is not exist.')
+            raise OSError(
+                'you might want to use --init initial, '
+                'because prima is not exist.'
+            )
 
 
 def merge():
@@ -243,8 +245,15 @@ def merge():
 def main():
     wlan_type, merge_type, tag = parameters()
     repo_url, staging, subdir = repo()
-    if not exists('drivers/staging') and not exists('Makefile'):
-        err('Please, run this script inside your root kernel source.')
+    if not exists('Makefile'):
+        raise OSError(
+            'Please, run this script inside your root kernel source.'
+        )
+    if not exists('drivers/staging'):
+        raise OSError(
+            "staging folder can't be found, "
+            'are you sure running it inside kernel source?'
+        )
     if check() is True:
         merge()
 

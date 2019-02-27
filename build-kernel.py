@@ -290,19 +290,17 @@ def make_wrapper():
         make()
     except CalledProcessError:
         if exists(join(sourcedir, '.config')
-                  ) or exists(join(sourcedir, 'include/config')):
-            # Just to make sure config is directory
-            if isdir(join(sourcedir, 'include/config')):
-                try:
-                    print('=== cleaning... ===')
-                    cmd = 'make mrproper'
-                    subprocess_run(cmd)
-                except CalledProcessError:
-                    print('!!! failed when cleaning, exiting... !!!')
-                    raise
-                else:
-                    print('=== re-runing the make again... ===')
-                    make()
+                  ) or isdir(join(sourcedir, 'include/config')):
+            try:
+                print('=== cleaning... ===')
+                cmd = 'make mrproper'
+                subprocess_run(cmd)
+            except CalledProcessError:
+                print('!!! failed when cleaning, exiting... !!!')
+                raise
+            else:
+                print('=== re-runing the make again... ===')
+                make()
         else:
             if device == 'mido':
                 cmd = 'git reset --hard'
@@ -325,7 +323,7 @@ def modules():
     srcdir = variables()['sourcedir']
     tcstrip = toolchain()['strip']
     if build_type == 'miui':
-        if exists(outmodule) and isfile(outmodule):
+        if isfile(outmodule):
             if cc == 'clang':
                 cmd = f'"{tcstrip}" --strip-debug "{outmodule}"'
             elif cc == 'gcc':
@@ -376,16 +374,16 @@ def zip_now():
             banner.write('\n')
             banner.write(r'       |____/torm \____|uard')
     # { delete old Image and Modules
-    if exists('Image.gz-dtb'):
+    if isfile('Image.gz-dtb'):
         remove('Image.gz-dtb')
     if device == 'whyred':
-        if exists(join(moduledir, 'qca_cld3/qca_cld3_wlan.ko')):
+        if isfile(join(moduledir, 'qca_cld3/qca_cld3_wlan.ko')):
             remove(join(moduledir, 'qca_cld3/qca_cld3_wlan.ko'))
     elif device == 'mido':
-        if exists(join(moduledir, 'qca_cld3/qca_cld3_wlan.ko')):
+        if isfile(join(moduledir, 'qca_cld3/qca_cld3_wlan.ko')):
             remove(join(moduledir, 'pronto/pronto_wlan.ko'))
     # }
-    if exists(image) and isfile(image):
+    if isfile(image):
         copy(image, anykernel)
     modules()
     zip_anykernel = ZipFile(finalzip, 'w', ZIP_DEFLATED)
@@ -408,7 +406,7 @@ def finalzip_sign():
     finalzip = variables()['finalzip']
     keystore_password = variables()['keystore']
     scriptdir = variables()['scriptdir']
-    if exists(finalzip):
+    if isfile(finalzip):
         keystore = join(scriptdir, 'bin/stormguard.keystore')
         cmd = (
             f'echo "{keystore_password}" | '
@@ -450,8 +448,7 @@ def GoogleDrive_Creds():
         'https://www.googleapis.com/auth/drive.apps.readonly'
     ]
     creds = None
-    if exists(join(scriptdir, 'token.pickle')
-              ) and isfile(join(scriptdir, 'token.pickle')):
+    if isfile(join(scriptdir, 'token.pickle')):
         with open(join(scriptdir, 'token.pickle'), 'rb') as token:
             creds = pickle.load(token)
     if not creds or not creds.valid:
@@ -566,13 +563,8 @@ def uploads():
     telegram = parameters()['telegram']
     verbose = parameters()['verbose']
     zipname = variables()['zipname']
-    if exists(finalzip) and isfile(finalzip):
-        if cpuquiet is False:
-            if release is True:
-                afh_upload()
-                print(' -> Creating mirror into GoogleDrive...')
-                file_id = GoogleDrive_Upload()
-        else:
+    if isfile(finalzip):
+        if cpuquiet is True:
             file_id = GoogleDrive_Upload()
             download_url = (
                 'https://drive.google.com/'
@@ -612,6 +604,11 @@ def uploads():
                         print('Error out of range...')
                 print(telegram.reason)
                 remove(msgtmp)
+        else:
+            if release is True:
+                afh_upload()
+                print(' -> Creating mirror into GoogleDrive...')
+                file_id = GoogleDrive_Upload()
 
 
 def main():
@@ -619,7 +616,7 @@ def main():
     upload = parameters()['upload']
     if not exists('Makefile'):
         raise FileNotFoundError('Please run this script inside kernel tree')
-    elif not isfile('Makefile'):
+    if not isfile('Makefile'):
         raise IsADirectoryError('Makefile is a directory...')
     parameters()
     P = Thread(target=make_wrapper)

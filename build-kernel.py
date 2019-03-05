@@ -419,21 +419,16 @@ def finalzip_sign():
         raise FileNotFoundError
 
 
-def finalzip_md5sum():
-    finalzip = variables()['finalzip']
-    verbose = parameters()['verbose']
-    if verbose is not True:
-        cmd = f'md5sum "{finalzip}" | cut -d " " -f1'
-        talk = subprocess_run(cmd)
-        md5 = talk[0].strip('\n')
-    else:
-        tmp = mkstemp()
-        output = tmp[1]
-        cmd = f'md5sum "{finalzip}" | cut -d " " -f1 > {output}'
-        subprocess_run(cmd)
-        with open(f'{output}') as sha:
-            md5 = sha.read().strip('\n')
-        remove(output)
+def md5sum_zip(finalzip):
+    import hashlib
+    md5 = hashlib.md5()
+    with open(finalzip, 'rb') as zip:
+        while True:
+            data = zip.read(4096)
+            if not data:
+                break
+            md5.update(data)
+    md5 = md5.hexdigest()
     return md5
 
 
@@ -572,7 +567,7 @@ def uploads():
             )
             if telegram is True:
                 from requests import post
-                md5 = finalzip_md5sum()
+                md5 = md5sum_zip(finalzip)
                 tg_chat = '-1001354431412'
                 with open(f'{home}/token', 'r') as tg_token:
                     token = tg_token.read().splitlines()[0]

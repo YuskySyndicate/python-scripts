@@ -139,9 +139,10 @@ def variables():
     )
     image = join(outdir, 'arch/arm64/boot/Image.gz-dtb')
     tcdir = join(kerneldir, 'toolchain')
-    keystore_password = open(f'{home}/keystore_password', 'r'
-                             ).read().splitlines()[0].split('=')[1]
-    afh_password = open(f'{home}/pass', 'r').read().splitlines()[0]
+    with open(f'{home}/keystore_password', 'r') as kp:
+        keystore_password = kp.read().splitlines()[0].split('=')[1]
+    with open(f'{home}/pass', 'r') as afh:
+        afh_password = afh.read().splitlines()[0]
     if device == 'whyred':
         defconfig = 'whyred_defconfig'
         version = version + '-' + 'MIUI'
@@ -217,7 +218,8 @@ def toolchain():
             output = tmp[1]
             cmd = f'echo "{clang_version}" > {output}'
             subprocess_run(cmd)
-            clang_version = open(f'{output}').read().strip('\n')
+            with open(f'{output}') as v:
+                clang_version = v.read().strip('\n')
         else:
             cmd = f'echo "{clang_version}"'
             talk = subprocess_run(cmd)
@@ -274,8 +276,7 @@ def make_wrapper():
     cmd = f'git checkout {branch}'
     subprocess_run(cmd)
     if device == 'mido':
-        cmd = 'git reset --hard'
-        subprocess_run(cmd)
+        reset()
         if oc is False:
             revert_commit = {
                 'custom': 'None',  # Haven't have time to rebase PIE
@@ -289,7 +290,7 @@ def make_wrapper():
     try:
         make()
     except CalledProcessError:
-        if exists(join(sourcedir, '.config')
+        if isfile(join(sourcedir, '.config')
                   ) or isdir(join(sourcedir, 'include/config')):
             try:
                 print('=== cleaning... ===')
@@ -302,15 +303,14 @@ def make_wrapper():
                 print('=== re-runing the make again... ===')
                 make()
         else:
-            if device == 'mido':
-                cmd = 'git reset --hard'
-                subprocess_run(cmd)
+            reset()
             print('!!! failed to make kernel image... !!!')
             raise
     else:
         print()
         print('--- Successfully built... ---')
         print()
+        reset()
 
 
 def modules():
@@ -399,6 +399,7 @@ def zip_now():
     # Remove created banner
     remove('banner')
     os.chdir(rundir)
+    finalzip_sign()
 
 
 # haven't got some idea to sign via python directly without subprocess
@@ -430,7 +431,8 @@ def finalzip_md5sum():
         output = tmp[1]
         cmd = f'md5sum "{finalzip}" | cut -d " " -f1 > {output}'
         subprocess_run(cmd)
-        md5 = open(f'{output}').read().strip('\n')
+        with open(f'{output}') as sha:
+            md5 = sha.read().strip('\n')
         remove(output)
     return md5
 
@@ -540,19 +542,17 @@ def GoogleDrive_Upload():
 def afh_upload():
     from ftplib import FTP
     password = variables()['afh']
-    rundir = variables()['rundir']
-    zipdir = variables()['zipdir']
+    finalzip = variables()['finalzip']
     zipname = variables()['zipname']
-    os.chdir(zipdir)
     with FTP('uploads.androidfilehost.com') as ftp:
         ftp.login('adek', password)
         try:
-            ftp.storbinary(f'STOR {zipname}', open(zipname, 'rb'))
+            with open(finalzip, 'rb') as afhzip:
+                ftp.storbinary(f'STOR {zipname}', afhzip)
         except ConnectionResetError:
             ftp.delete(zipname)
             print('!!! deleting uploaded file... !!!')
             raise
-    os.chdir(rundir)
 
 
 def uploads():
@@ -574,7 +574,8 @@ def uploads():
                 from requests import post
                 md5 = finalzip_md5sum()
                 tg_chat = '-1001354431412'
-                token = open(f'{home}/token', 'r').read().splitlines()[0]
+                with open(f'{home}/token', 'r') as tg_token:
+                    token = tg_token.read().splitlines()[0]
                 tmp = mkstemp()
                 msgtmp = tmp[1]
                 with open(msgtmp, 'w', newline='\n') as msg:
@@ -602,7 +603,7 @@ def uploads():
                         print('Wrong / Unauth token...')
                     else:
                         print('Error out of range...')
-                print(telegram.reason)
+                    print(telegram.reason)
                 remove(msgtmp)
         else:
             if release is True:
@@ -611,8 +612,20 @@ def uploads():
                 file_id = GoogleDrive_Upload()
 
 
-def main():
+def reset():
     device = parameters()['device']
+    verbose = parameters()['verbose']
+    if device == 'mido':
+        if verbose is True:
+            cmd = 'git reset -q --hard'
+        else:
+            cmd = 'git reset --hard'
+        subprocess_run(cmd)
+    else:
+        return
+
+
+def main():
     upload = parameters()['upload']
     if not exists('Makefile'):
         raise FileNotFoundError('Please run this script inside kernel tree')
@@ -644,14 +657,10 @@ def main():
     print(h)
     print()
     zip_now()
-    finalzip_sign()
     if upload is True:
         print('==> Uploading...')
         uploads()
         print('==> Upload success...')
-    if device == 'mido':
-        cmd = 'git reset --hard'
-        subprocess_run(cmd)
 
 
 if __name__ == '__main__':

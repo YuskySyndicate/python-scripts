@@ -542,9 +542,8 @@ def afh_upload():
     with FTP('uploads.androidfilehost.com') as ftp:
         ftp.login('adek', password)
         try:
-            with open(finalzip, 'rb') as afhzip:
-                ftp.storbinary(f'STOR {zipname}', afhzip)
-        except ConnectionResetError:
+            ftp.storbinary(f'STOR {zipname}', open(finalzip, 'rb'))
+        except Exception:
             ftp.delete(zipname)
             print('!!! deleting uploaded file... !!!')
             raise

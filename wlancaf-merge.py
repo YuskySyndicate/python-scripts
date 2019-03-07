@@ -48,6 +48,8 @@ def git_env():
     sub_version = int(version[1])
     if major_version >= 2 and sub_version >= 9:
         extra_cmd = '--allow-unrelated-histories'
+    else:
+        extra_cmd = None
     return extra_cmd
 
 

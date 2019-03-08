@@ -380,7 +380,7 @@ def zip_now():
         if isfile(join(moduledir, 'qca_cld3/qca_cld3_wlan.ko')):
             remove(join(moduledir, 'qca_cld3/qca_cld3_wlan.ko'))
     elif device == 'mido':
-        if isfile(join(moduledir, 'qca_cld3/qca_cld3_wlan.ko')):
+        if isfile(join(moduledir, 'wlan.ko')):
             remove(join(moduledir, 'pronto/pronto_wlan.ko'))
     # }
     if isfile(image):
@@ -396,8 +396,9 @@ def zip_now():
             # also write empty folder too
             for dirnames in directories:
                 ak.write(join(root, dirnames))
-    # Remove created banner
-    remove('banner')
+    if exists('banner'):
+        # Remove created banner
+        remove('banner')
     os.chdir(rundir)
     finalzip_sign()
 
@@ -620,12 +621,12 @@ def reset():
 
 
 def main():
-    upload = parameters()['upload']
     if not exists('Makefile'):
         raise FileNotFoundError('Please run this script inside kernel tree')
-    if not isfile('Makefile'):
+    if isdir('Makefile'):
         raise IsADirectoryError('Makefile is a directory...')
     parameters()
+    upload = parameters()['upload']
     P = Thread(target=make_wrapper)
     P.start()
     P.join()

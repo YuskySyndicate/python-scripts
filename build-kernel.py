@@ -96,12 +96,10 @@ def subprocess_run(cmd):
     talk = subproc.communicate()
     exitCode = subproc.returncode
     if exitCode != 0 and verbose is not True:
-        print(
-            'An error was detected while running the subprocess:\n'
-            f'exit code: {exitCode}\n'
-            f'stdout: {talk[0]}\n'
-            f'stderr: {talk[1]}'
-        )
+        print('An error was detected while running the subprocess:\n'
+              f'exit code: {exitCode}\n'
+              f'stdout: {talk[0]}\n'
+              f'stderr: {talk[1]}')
         raise CalledProcessError(exitCode, cmd)
     elif exitCode != 0 and verbose is True:
         # using sys.stdout/sys.stderr in Popen stdout/stderr
@@ -350,12 +348,11 @@ def modules():
             raise FileNotFoundError('!!! module not found... !!!')
 
 
-def zip_now():
+def zip_now(finalzip):
     from zipfile import ZipFile, ZIP_DEFLATED
     anykernel = variables()['anykernel']
     device = parameters()['device']
     image = variables()['image']
-    finalzip = variables()['finalzip']
     moduledir = variables()['moduledir']
     release = parameters()['release']
     rundir = variables()['rundir']
@@ -400,12 +397,11 @@ def zip_now():
         # Remove created banner
         remove('banner')
     os.chdir(rundir)
-    finalzip_sign()
+    finalzip_sign(finalzip)
 
 
 # haven't got some idea to sign via python directly without subprocess
-def finalzip_sign():
-    finalzip = variables()['finalzip']
+def finalzip_sign(finalzip):
     keystore_password = variables()['keystore']
     scriptdir = variables()['scriptdir']
     if isfile(finalzip):
@@ -433,112 +429,107 @@ def md5sum_zip(finalzip):
     return md5
 
 
-def GoogleDrive_Creds():
-    from googleapiclient.discovery import build
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    from google.auth.transport.requests import Request
-    import pickle
-    scriptdir = variables()['scriptdir']
-    SCOPES = [
-        'https://www.googleapis.com/auth/drive',
-        'https://www.googleapis.com/auth/drive.file',
-        'https://www.googleapis.com/auth/drive.appdata',
-        'https://www.googleapis.com/auth/drive.apps.readonly'
-    ]
-    creds = None
-    if isfile(join(scriptdir, 'token.pickle')):
-        with open(join(scriptdir, 'token.pickle'), 'rb') as token:
-            creds = pickle.load(token)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                join(scriptdir, 'credential.json'), SCOPES)
-            creds = flow.run_local_server()
-        with open(join(scriptdir, 'token.pickle'), 'wb') as token:
-            pickle.dump(creds, token)
-    service = build('drive', 'v3', credentials=creds)
-    return service
+class GoogleDrive(object):
 
+    def __init__(self):
+        from googleapiclient.discovery import build
+        from google_auth_oauthlib.flow import InstalledAppFlow
+        from google.auth.transport.requests import Request
+        import pickle
+        scriptdir = variables()['scriptdir']
+        SCOPES = [
+            'https://www.googleapis.com/auth/drive',
+            'https://www.googleapis.com/auth/drive.file',
+            'https://www.googleapis.com/auth/drive.appdata',
+            'https://www.googleapis.com/auth/drive.apps.readonly'
+        ]
+        creds = None
+        if isfile(join(scriptdir, 'token.pickle')):
+            with open(join(scriptdir, 'token.pickle'), 'rb') as token:
+                creds = pickle.load(token)
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    join(scriptdir, 'credential.json'), SCOPES)
+                creds = flow.run_local_server()
+            with open(join(scriptdir, 'token.pickle'), 'wb') as token:
+                pickle.dump(creds, token)
+        self.service = build('drive', 'v3', credentials=creds)
 
-def GoogleDrive_checkFolder():
-    service = GoogleDrive_Creds()
-    device = parameters()['device']
-    version = parameters()['version']
-    print(' -> Checking folder...')
-    parents_id = {
-        'cpuquiet': '1i5XRVcO3Q8y8OFAOxXU-UWGWmQJiKo2u',
-        'whyred': '1YjsSb1JYqWOANua07kd_UN4q2vPoq1iv',
-        'mido': '1fkEmVBKD0cHMY1kbkpr4Bwm9v3COPPjf'
-    }
-    if device == 'whyred':
-        parents_id = parents_id['whyred']
-    elif device == 'mido':
-        parents_id = parents_id['cpuquiet']
-    folder_metadata = {
-        'name': version,
-        'parents': [parents_id],
-        'mimeType': 'application/vnd.google-apps.folder'
-    }
-    page_token = None
-    response = service.files().list(
-        q=f"name='{version}'",
-        spaces='drive',
-        fields=(
-            'nextPageToken, '
-            'files(parents, name, id)'
-        ),
-        pageToken=page_token
-    ).execute()
-    try:
-        is_exists = response.get('files', [])[0]
-    except IndexError:
-        print('    folder not exists, creating one...')
-        folder = service.files().create(
-            body=folder_metadata,
+    def Upload(self, finalzip):
+        from googleapiclient.http import MediaFileUpload
+        print(' -> Uploading to GoogleDrive...')
+        folder_id = GoogleDrive.CheckFolder()
+        zipname = variables()['zipname']
+        file_metadata = {
+            'name': zipname,
+            'parents': [folder_id]
+        }
+        media = MediaFileUpload(
+                finalzip,
+                mimetype='application/zip',
+                resumable=True
+        )
+        file = self.service.files().create(
+            body=file_metadata,
+            media_body=media,
             fields='id'
         ).execute()
-        folder_id = folder.get('id')
-    else:
-        print('    folder exists, using it as parent...')
-        name = is_exists.get('name')
-        parent = is_exists.get('parents')[0]
-        if name == version and parent == parents_id:
-            folder_id = is_exists.get('id')
-    page_token = response.get('nextPageToken', None)
-    return folder_id
+        file_id = file.get('id')
+        return file_id
+
+    def CheckFolder(self):
+        device = parameters()['device']
+        version = parameters()['version']
+        print(' -> Checking folder...')
+        parents_id = {
+            'cpuquiet': '1i5XRVcO3Q8y8OFAOxXU-UWGWmQJiKo2u',
+            'whyred': '1YjsSb1JYqWOANua07kd_UN4q2vPoq1iv',
+            'mido': '1fkEmVBKD0cHMY1kbkpr4Bwm9v3COPPjf'
+        }
+        if device == 'whyred':
+            parents_id = parents_id['whyred']
+        elif device == 'mido':
+            parents_id = parents_id['cpuquiet']
+        folder_metadata = {
+            'name': version,
+            'parents': [parents_id],
+            'mimeType': 'application/vnd.google-apps.folder'
+        }
+        page_token = None
+        response = self.service.files().list(
+            q=f"name='{version}'",
+            spaces='drive',
+            fields=(
+                'nextPageToken, '
+                'files(parents, name, id)'
+            ),
+            pageToken=page_token
+        ).execute()
+        try:
+            is_exists = response.get('files', [])[0]
+        except IndexError:
+            print('    folder not exists, creating now...')
+            folder = self.service.files().create(
+                body=folder_metadata,
+                fields='id'
+            ).execute()
+            folder_id = folder.get('id')
+        else:
+            print('    folder exists, using it as parent...')
+            name = is_exists.get('name')
+            parent = is_exists.get('parents')[0]
+            if name == version and parent == parents_id:
+                folder_id = is_exists.get('id')
+        page_token = response.get('nextPageToken', None)
+        return folder_id
 
 
-def GoogleDrive_Upload():
-    from googleapiclient.http import MediaFileUpload
-    finalzip = variables()['finalzip']
-    folder_id = GoogleDrive_checkFolder()
-    print(' -> Uploading to GoogleDrive...')
-    service = GoogleDrive_Creds()
-    zipname = variables()['zipname']
-    file_metadata = {
-        'name': zipname,
-        'parents': [folder_id]
-    }
-    media = MediaFileUpload(
-        finalzip,
-        mimetype='application/zip',
-        resumable=True
-    )
-    file = service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id'
-    ).execute()
-    file_id = file.get('id')
-    return file_id
-
-
-def afh_upload():
+def afh_upload(finalzip):
     from ftplib import FTP
     password = variables()['afh']
-    finalzip = variables()['finalzip']
     zipname = variables()['zipname']
     with FTP('uploads.androidfilehost.com') as ftp:
         ftp.login('adek', password)
@@ -550,9 +541,8 @@ def afh_upload():
             raise
 
 
-def uploads():
+def Uploads(finalzip):
     cpuquiet = parameters()['cpuquiet']
-    finalzip = variables()['finalzip']
     home = variables()['home']
     release = parameters()['release']
     telegram = parameters()['telegram']
@@ -560,7 +550,7 @@ def uploads():
     zipname = variables()['zipname']
     if isfile(finalzip):
         if cpuquiet is True:
-            file_id = GoogleDrive_Upload()
+            file_id = GoogleDrive.Upload(finalzip)
             download_url = (
                 'https://drive.google.com/'
                 f'uc?id={file_id}&export=download'
@@ -602,9 +592,9 @@ def uploads():
                 remove(msgtmp)
         else:
             if release is True:
-                afh_upload()
+                afh_upload(finalzip)
                 print(' -> Creating mirror into GoogleDrive...')
-                file_id = GoogleDrive_Upload()
+                file_id = GoogleDrive.Upload(finalzip)
 
 
 def reset():
@@ -627,6 +617,7 @@ def main():
         raise IsADirectoryError('Makefile is a directory...')
     parameters()
     upload = parameters()['upload']
+    finalzip = variables()['finalzip']
     P = Thread(target=make_wrapper)
     P.start()
     P.join()
@@ -654,7 +645,7 @@ def main():
     zip_now()
     if upload is True:
         print('==> Uploading...')
-        uploads()
+        Uploads(finalzip)
         print('==> Upload success...')
 
 

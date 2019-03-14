@@ -642,7 +642,7 @@ def main():
     print(f'--- build took {minutes} {m_msg}, and {seconds} {s_msg} ---')
     print(h)
     print()
-    zip_now()
+    zip_now(finalzip)
     if upload is True:
         print('==> Uploading...')
         Uploads(finalzip)

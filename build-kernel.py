@@ -348,7 +348,7 @@ def modules():
             raise FileNotFoundError('!!! module not found... !!!')
 
 
-def zip_now(finalzip):
+def zip_now(zippath):
     from zipfile import ZipFile, ZIP_DEFLATED
     anykernel = variables()['anykernel']
     device = parameters()['device']
@@ -383,7 +383,7 @@ def zip_now(finalzip):
     if isfile(image):
         copy(image, anykernel)
     modules()
-    zip_anykernel = ZipFile(finalzip, 'w', ZIP_DEFLATED)
+    zip_anykernel = ZipFile(zippath, 'w', ZIP_DEFLATED)
     with zip_anykernel as ak:
         for root, directories, files in os.walk('.'):
             files = [f for f in files if not f[0] == '.']
@@ -397,7 +397,7 @@ def zip_now(finalzip):
         # Remove created banner
         remove('banner')
     os.chdir(rundir)
-    finalzip_sign(finalzip)
+    finalzip_sign(zippath)
 
 
 # haven't got some idea to sign via python directly without subprocess
@@ -461,17 +461,16 @@ class GoogleDrive(object):
         return service
 
     @staticmethod
-    def Upload(File):
+    def Upload(filename, filepath):
         from googleapiclient.http import MediaFileUpload
         print(' -> Uploading to GoogleDrive...')
         folder_id = GoogleDrive.CheckFolder()
-        zipname = variables()['zipname']
         file_metadata = {
-            'name': zipname,
+            'name': filename,
             'parents': [folder_id]
         }
         media = MediaFileUpload(
-                File,
+                filepath,
                 mimetype='application/zip',
                 resumable=True
         )
@@ -531,30 +530,28 @@ class GoogleDrive(object):
         return folder_id
 
 
-def afh_upload(finalzip):
+def afh_upload(filename, filepath):
     from ftplib import FTP
     password = variables()['afh']
-    zipname = variables()['zipname']
     with FTP('uploads.androidfilehost.com') as ftp:
         ftp.login('adek', password)
         try:
-            ftp.storbinary(f'STOR {zipname}', open(finalzip, 'rb'))
+            ftp.storbinary(f'STOR {filename}', open(filepath, 'rb'))
         except Exception:
-            ftp.delete(zipname)
+            ftp.delete(filename)
             print('!!! deleting uploaded file... !!!')
             raise
 
 
-def Uploads(finalzip):
+def Uploads(zipname, finalzip):
     cpuquiet = parameters()['cpuquiet']
     home = variables()['home']
     release = parameters()['release']
     telegram = parameters()['telegram']
     verbose = parameters()['verbose']
-    zipname = variables()['zipname']
     if isfile(finalzip):
         if cpuquiet is True:
-            file_id = GoogleDrive.Upload(finalzip)
+            file_id = GoogleDrive.Upload(zipname, finalzip)
             download_url = (
                 'https://drive.google.com/'
                 f'uc?id={file_id}&export=download'
@@ -596,9 +593,9 @@ def Uploads(finalzip):
                 remove(msgtmp)
         else:
             if release is True:
-                afh_upload(finalzip)
+                afh_upload(zipname, finalzip)
                 print(' -> Creating mirror into GoogleDrive...')
-                file_id = GoogleDrive.Upload(finalzip)
+                file_id = GoogleDrive.Upload(zipname, finalzip)
 
 
 def reset():
@@ -622,6 +619,7 @@ def main():
     parameters()
     upload = parameters()['upload']
     finalzip = variables()['finalzip']
+    zipname = variables()['zipname']
     P = Thread(target=make_wrapper)
     P.start()
     P.join()
@@ -649,7 +647,7 @@ def main():
     zip_now(finalzip)
     if upload is True:
         print('==> Uploading...')
-        Uploads(finalzip)
+        Uploads(zipname, finalzip)
         print('==> Upload success...')
 
 

@@ -595,7 +595,9 @@ def Uploads(zipname, finalzip):
             if release is True:
                 afh_upload(zipname, finalzip)
                 print(' -> Creating mirror into GoogleDrive...')
-                file_id = GoogleDrive.Upload(zipname, finalzip)
+                GoogleDrive.Upload(zipname, finalzip)
+            else:
+                GoogleDrive.Upload(zipname, finalzip)
 
 
 def reset():
@@ -636,12 +638,10 @@ def main():
     else:
         m_msg = 'minutes'
         h = '============================================'
-    if seconds <= 1:
-        s_msg = 'second'
-    else:
-        s_msg = 'seconds'
+        if minutes >= 10:
+            h = '============================================='
     print(h)
-    print(f'--- build took {minutes} {m_msg}, and {seconds} {s_msg} ---')
+    print(f'--- build took {minutes} {m_msg}, and {seconds} seconds ---')
     print(h)
     print()
     zip_now(finalzip)

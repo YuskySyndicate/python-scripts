@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+#
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Copyright (C) 2019 Adek Maulana
@@ -248,5 +250,6 @@ def main():
         merge()
 
 
-parameters()
-main()
+if __name__ == '__main__':
+    parameters()
+    main()

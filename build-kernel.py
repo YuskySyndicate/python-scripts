@@ -431,7 +431,8 @@ def md5sum_zip(finalzip):
 
 class GoogleDrive(object):
 
-    def __init__(self):
+    @staticmethod
+    def Service():
         from googleapiclient.discovery import build
         from google_auth_oauthlib.flow import InstalledAppFlow
         from google.auth.transport.requests import Request
@@ -456,9 +457,11 @@ class GoogleDrive(object):
                 creds = flow.run_local_server()
             with open(join(scriptdir, 'token.pickle'), 'wb') as token:
                 pickle.dump(creds, token)
-        self.service = build('drive', 'v3', credentials=creds)
+        service = build('drive', 'v3', credentials=creds)
+        return service
 
-    def Upload(self, finalzip):
+    @staticmethod
+    def Upload(File):
         from googleapiclient.http import MediaFileUpload
         print(' -> Uploading to GoogleDrive...')
         folder_id = GoogleDrive.CheckFolder()
@@ -468,11 +471,11 @@ class GoogleDrive(object):
             'parents': [folder_id]
         }
         media = MediaFileUpload(
-                finalzip,
+                File,
                 mimetype='application/zip',
                 resumable=True
         )
-        file = self.service.files().create(
+        file = GoogleDrive.Service().files().create(
             body=file_metadata,
             media_body=media,
             fields='id'
@@ -480,7 +483,8 @@ class GoogleDrive(object):
         file_id = file.get('id')
         return file_id
 
-    def CheckFolder(self):
+    @staticmethod
+    def CheckFolder():
         device = parameters()['device']
         version = parameters()['version']
         print(' -> Checking folder...')
@@ -499,7 +503,7 @@ class GoogleDrive(object):
             'mimeType': 'application/vnd.google-apps.folder'
         }
         page_token = None
-        response = self.service.files().list(
+        response = GoogleDrive.Service().files().list(
             q=f"name='{version}'",
             spaces='drive',
             fields=(
@@ -512,7 +516,7 @@ class GoogleDrive(object):
             is_exists = response.get('files', [])[0]
         except IndexError:
             print('    folder not exists, creating now...')
-            folder = self.service.files().create(
+            folder = GoogleDrive.Service().files().create(
                 body=folder_metadata,
                 fields='id'
             ).execute()

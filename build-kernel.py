@@ -53,20 +53,16 @@ def parameters():
     if device == 'whyred':
         # Let's fail all of this if depencies are met, because i'm stupid.
         if True in [cpuquiet, oc, build_type == 'custom']:
-            param.error(
-                '\n'
-                '[-c/--cpuquiet, -o/--overclock, -b/--build = custom], '
-                "isn't available for whyred"
-            )
+            print()
+            param.error('[-c/--cpuquiet, -o/--overclock, -b/--build = custom],'
+                        " isn't available for whyred")
     elif device == 'mido':
         if cpuquiet is False:
             param.error('mido already drop support for non-cpuquiet')
     # Fail build if using version beta|test|personal while using --release
     if version in ['beta' or 'test' or 'personal'] and release is True:
-        param.error(
-            'version beta|test|personal, '
-            "can't be passed with --release"
-        )
+        param.error('version beta|test|personal, '
+                    "can't be passed with --release")
     return {
         'type': build_type,
         'cpuquiet': cpuquiet,
@@ -82,7 +78,6 @@ def parameters():
 
 
 def subprocess_run(cmd):
-    global exitCode
     verbose = parameters()['verbose']
     if verbose is True:
         stdout_val = sys.stdout
@@ -131,10 +126,8 @@ def variables():
     sourcedir = join(kerneldir, device)
     anykernel = join(kerneldir, f'anykernel/{device}/{build_type}')
     outdir = join(kerneldir, f'build/out/target/kernel/{device}/{build_type}')
-    zipdir = join(
-        kerneldir,
-        f'build/out/target/kernel/zip/{device}/{build_type}'
-    )
+    zipdir = join(kerneldir,
+                  f'build/out/target/kernel/zip/{device}/{build_type}')
     image = join(outdir, 'arch/arm64/boot/Image.gz-dtb')
     tcdir = join(kerneldir, 'toolchain')
     with open(f'{home}/keystore_password', 'r') as kp:
@@ -202,12 +195,10 @@ def toolchain():
     if cc == 'clang':
         clang = join(tcdir, 'google-clang/bin/clang')
         clangcc = ' '.join(['ccache', clang])
-        clang_version = (
-            f'$({clang} --version | head -n 1 | '
-            r'perl -pe "s/\(http.*?\)//gs" | '
-            'sed -e "s/  */ /g" -e "s/[[:space:]]*$//" | '
-            'cut -d " " -f-1,6-8)'
-        )
+        clang_version = (f'$({clang} --version | head -n 1 | '
+                         r'perl -pe "s/\(http.*?\)//gs" | '
+                         'sed -e "s/  */ /g" -e "s/[[:space:]]*$//" | '
+                         'cut -d " " -f-1,6-8)')
         # stdout=sys.stdout causing subprocess is giving NoneType output,
         # so we need special case for --verbose if it's True
         output = None
@@ -222,12 +213,12 @@ def toolchain():
             cmd = f'echo "{clang_version}"'
             talk = subprocess_run(cmd)
             clang_version = talk[0].strip('\n')
-        clangopt = ' '.join([
-            f'CC="{clangcc}"',
-            'CLANG_TRIPLE="aarch64-linux-gnu-"',
-            'CLANG_TRIPLE_ARM32="arm-linux-gnueabi-"',
-            f'KBUILD_COMPILER_STRING="{clang_version}"'
-        ])
+        clangopt = ' '.join(
+            [f'CC="{clangcc}"',
+             'CLANG_TRIPLE="aarch64-linux-gnu-"',
+             'CLANG_TRIPLE_ARM32="arm-linux-gnueabi-"',
+             f'KBUILD_COMPILER_STRING="{clang_version}"']
+        )
         if output is not None:
             remove(output)
     return {
@@ -251,15 +242,11 @@ def make():
     cmd = f'make ARCH=arm64 O="{outdir}" {defconfig}'
     subprocess_run(cmd)
     if cc == 'clang':
-        cmd = (
-            f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="{gcc}" '
-            f'CROSS_COMPILE_ARM32="{gcc32}" -j4 {clangopt}'
-        )
+        cmd = (f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="{gcc}" '
+               f'CROSS_COMPILE_ARM32="{gcc32}" -j4 {clangopt}')
     elif cc == 'gcc':
-        cmd = (
-            f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="ccache {gcc}'
-            f'CROSS_COMPILE_ARM32="ccache {gcc32}" -j4'
-        )
+        cmd = (f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="ccache {gcc}'
+               f'CROSS_COMPILE_ARM32="ccache {gcc32}" -j4')
     subprocess_run(cmd)
 
 
@@ -406,11 +393,9 @@ def finalzip_sign(finalzip):
     scriptdir = variables()['scriptdir']
     if isfile(finalzip):
         keystore = join(scriptdir, 'bin/stormguard.keystore')
-        cmd = (
-            f'echo "{keystore_password}" | '
-            f'jarsigner -keystore {keystore} '
-            f'"{finalzip}" stormguard'
-        )
+        cmd = (f'echo "{keystore_password}" | '
+               f'jarsigner -keystore {keystore} '
+               f'"{finalzip}" stormguard')
         subprocess_run(cmd)
     else:
         raise FileNotFoundError
@@ -552,10 +537,8 @@ def Uploads(zipname, finalzip):
     if isfile(finalzip):
         if cpuquiet is True:
             file_id = GoogleDrive.Upload(zipname, finalzip)
-            download_url = (
-                'https://drive.google.com/'
-                f'uc?id={file_id}&export=download'
-            )
+            download_url = ('https://drive.google.com/'
+                            f'uc?id={file_id}&export=download')
             if telegram is True:
                 from requests import post
                 md5 = md5sum_zip(finalzip)

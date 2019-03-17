@@ -11,7 +11,7 @@ import psutil
 from datetime import datetime
 from argparse import ArgumentParser
 from subprocess import Popen, PIPE, CalledProcessError
-from threading import Thread
+from multiprocessing import Process
 from os import remove, chdir
 from os.path import exists, isfile, expanduser, join, realpath, isdir, dirname
 from shutil import copy2 as copy
@@ -23,8 +23,12 @@ date_time = datetime.now().strftime('%Y%m%d-%H%M')
 
 def parameters():
     param = ArgumentParser(description='Kernel Build Script.', )
+    group = param.add_mutually_exclusive_group()
     param.add_argument('-b', '--build',
                        choices=['miui', 'custom'], required=True)
+    group.add_argument('--clean-only', dest='clean_only', action='store_true')
+    group.add_argument('--clean-and-build', dest='clean_and_build',
+                       action='store_true')
     param.add_argument('-c', '--cpuquiet', action='store_true')
     param.add_argument('-d', '--device',
                        choices=['mido', 'whyred'], required=True)
@@ -42,6 +46,8 @@ def parameters():
     param.add_argument('-cc', '--cc', choices=['clang', 'gcc'], required=True)
     params = vars(param.parse_args())
     build_type = params['build']
+    clean_only = params['clean_only']
+    clean_and_build = params['clean_and_build']
     cpuquiet = params['cpuquiet']
     device = params['device']
     oc = params['overclock']
@@ -67,6 +73,7 @@ def parameters():
                     "can't be passed with --release")
     return {
         'type': build_type,
+        'clean': [clean_only, clean_and_build],
         'cpuquiet': cpuquiet,
         'device': device,
         'overclock': oc,
@@ -252,6 +259,30 @@ def make():
     subprocess_run(cmd)
 
 
+def make_clean():
+    clean = parameters()['clean']
+    outdir = variables()['outdir']
+    print('Cleaning outdir...')
+    if clean[0] is True:
+        try:
+            cmd = f'make -s clean O={outdir}'
+            subprocess_run(cmd)
+        except CalledProcessError as e:
+            print('Cleaning failed...')
+            raise e
+        else:
+            sys.exit(0)
+    elif clean[1] is True:
+        try:
+            cmd = f'make -s clean O={outdir}'
+            subprocess_run(cmd)
+        except CalledProcessError as e:
+            print('Cleaning failed...')
+            raise e
+    else:
+        pass
+
+
 def make_wrapper():
     build_type = parameters()['type']
     oc = parameters()['overclock']
@@ -280,18 +311,18 @@ def make_wrapper():
         if isfile(join(sourcedir, '.config')
                   ) or isdir(join(sourcedir, 'include/config')):
             try:
-                print('=== cleaning... ===')
+                print('=== Cleaning... ===')
                 cmd = 'make mrproper'
                 subprocess_run(cmd)
             except CalledProcessError:
-                print('!!! failed when cleaning, exiting... !!!')
+                print('!!! Failed when cleaning, exiting... !!!')
                 raise
             else:
-                print('=== re-runing the make again... ===')
+                print('=== Re-runing the make again... ===')
                 make()
         else:
             reset()
-            print('!!! failed to make kernel image... !!!')
+            print('!!! Failed to make kernel image... !!!')
             raise
     else:
         print()
@@ -448,10 +479,10 @@ class GoogleDrive(object):
         return service
 
     @staticmethod
-    def Upload(filename, filepath):
+    def Upload(device, version, filename, filepath):
         from googleapiclient.http import MediaFileUpload
         print(' -> Uploading to GoogleDrive...')
-        folder_id = GoogleDrive.CheckFolder()
+        folder_id = GoogleDrive.CheckFolder(device, version)
         file_metadata = {
             'name': filename,
             'parents': [folder_id]
@@ -470,9 +501,7 @@ class GoogleDrive(object):
         return file_id
 
     @staticmethod
-    def CheckFolder():
-        device = parameters()['device']
-        version = parameters()['version']
+    def CheckFolder(device, version):
         print(' -> Checking folder...')
         parents_id = {
             'cpuquiet': '1i5XRVcO3Q8y8OFAOxXU-UWGWmQJiKo2u',
@@ -530,7 +559,7 @@ def afh_upload(filename, filepath):
             raise
 
 
-def Uploads(zipname, finalzip):
+def Uploads(device, version, zipname, finalzip):
     cpuquiet = parameters()['cpuquiet']
     home = variables()['home']
     release = parameters()['release']
@@ -538,7 +567,7 @@ def Uploads(zipname, finalzip):
     verbose = parameters()['verbose']
     if isfile(finalzip):
         if cpuquiet is True:
-            file_id = GoogleDrive.Upload(zipname, finalzip)
+            file_id = GoogleDrive.Upload(device, version, zipname, finalzip)
             download_url = ('https://drive.google.com/'
                             f'uc?id={file_id}&export=download')
             if telegram is True:
@@ -580,9 +609,9 @@ def Uploads(zipname, finalzip):
             if release is True:
                 afh_upload(zipname, finalzip)
                 print(' -> Creating mirror into GoogleDrive...')
-                GoogleDrive.Upload(zipname, finalzip)
+                GoogleDrive.Upload(device, version, zipname, finalzip)
             else:
-                GoogleDrive.Upload(zipname, finalzip)
+                GoogleDrive.Upload(device, version, zipname, finalzip)
 
 
 def reset():
@@ -600,14 +629,17 @@ def reset():
 
 def main():
     if not exists('Makefile'):
-        raise FileNotFoundError('Please run this script inside kernel tree')
+        print('Please run this script inside kernel tree')
+        raise FileNotFoundError
     if isdir('Makefile'):
-        raise IsADirectoryError('Makefile is a directory...')
-    parameters()
+        print('Makefile is a directory...')
+        raise IsADirectoryError
+    device = parameters()['device']
     upload = parameters()['upload']
     finalzip = variables()['finalzip']
+    version = parameters()['version']
     zipname = variables()['zipname']
-    P = Thread(target=make_wrapper)
+    P = Process(target=make_wrapper, name='make_kernel')
     P.start()
     P.join()
     end = time()
@@ -632,9 +664,11 @@ def main():
     zip_now(finalzip)
     if upload is True:
         print('==> Uploading...')
-        Uploads(zipname, finalzip)
+        Uploads(device, version, zipname, finalzip)
         print('==> Upload success...')
 
 
 if __name__ == '__main__':
+    parameters()
+    make_clean()
     main()

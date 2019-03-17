@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -262,8 +262,8 @@ def make():
 def make_clean():
     clean = parameters()['clean']
     outdir = variables()['outdir']
-    print('Cleaning outdir...')
     if clean[0] is True:
+        print('Cleaning outdir...')
         try:
             cmd = f'make -s clean O={outdir}'
             subprocess_run(cmd)
@@ -273,6 +273,7 @@ def make_clean():
         else:
             sys.exit(0)
     elif clean[1] is True:
+        print('Cleaning outdir...')
         try:
             cmd = f'make -s clean O={outdir}'
             subprocess_run(cmd)

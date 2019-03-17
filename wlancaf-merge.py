@@ -114,9 +114,10 @@ def check():
             else:
                 return True
         else:
-            raise OSError('you might want to use --init initial, '
-                          'because those 3 are exists, '
-                          '\nor one of them is exist and not empty.')
+            print('you might want to use --init initial, '
+                  'because those 3 are exists, '
+                  '\nor one of them is exist and not empty.')
+            raise OSError
     elif wlan_type == 'qcacld' and merge_type == 'update':
         for subdirs in subdir:
             if isdir(join(staging, subdirs)):
@@ -133,14 +134,16 @@ def check():
             else:
                 continue
         else:
-            raise OSError('you might want to use --init update, '
-                          'because those 3 are not exists.'
-                          '\nor exists but one of them has an empty folder.')
+            print('you might want to use --init update, '
+                  'because those 3 are not exists.'
+                  '\nor exists but one of them has an empty folder.')
+            raise OSError
     elif wlan_type == 'prima' and merge_type == 'initial':
         if isdir(join(staging, subdir)):
             if listdir(join(staging, subdir)):
-                raise OSError('you might want to use --init update, '
-                              '\nbecause prima is exist and it is not empty.')
+                print('you might want to use --init update, '
+                      '\nbecause prima is exist and it is not empty.')
+                raise OSError
             else:
                 return True
         else:
@@ -150,12 +153,12 @@ def check():
             if listdir(join(staging, subdir)):
                 return True
             else:
-                raise OSError(
-                    'folder prima exist, but it is just an empty folder.'
-                )
+                print('folder prima exist, but it is just an empty folder.')
+                raise OSError
         else:
-            raise OSError('you might want to use --init initial, '
-                          'because prima is not exist.')
+            print('you might want to use --init initial, '
+                  'because prima is not exist.')
+            raise OSError
 
 
 def merge():
@@ -242,10 +245,12 @@ def main():
     wlan_type, merge_type, tag = parameters()
     repo_url, staging, subdir = repo()
     if not exists('Makefile'):
-        raise OSError('Run this script inside your root kernel source.')
+        print('Run this script inside your root kernel source.')
+        raise OSError
     if not exists('drivers/staging'):
-        raise OSError("staging folder can't be found, "
-                      'are you sure running it inside kernel source?')
+        print("staging folder can't be found, "
+              'are you sure running it inside kernel source?')
+        raise OSError
     if check() is True:
         merge()
 

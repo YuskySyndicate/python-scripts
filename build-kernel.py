@@ -252,10 +252,10 @@ def make():
     subprocess_run(cmd)
     if cc == 'clang':
         cmd = (f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="{gcc}" '
-               f'CROSS_COMPILE_ARM32="{gcc32}" -j4 {clangopt}')
+               f'CROSS_COMPILE_ARM32="{gcc32}" -j8 {clangopt}')
     elif cc == 'gcc':
         cmd = (f'make ARCH=arm64 O="{outdir}" CROSS_COMPILE="ccache {gcc}'
-               f'CROSS_COMPILE_ARM32="ccache {gcc32}" -j4')
+               f'CROSS_COMPILE_ARM32="ccache {gcc32}" -j8')
     subprocess_run(cmd)
 
 
@@ -288,6 +288,7 @@ def make_wrapper():
     build_type = parameters()['type']
     oc = parameters()['overclock']
     device = parameters()['device']
+    finalzip = variables()['finalzip']
     sourcedir = variables()['sourcedir']
     branch = variables()['branch']
     # In-Into sourcedir and change the branch
@@ -308,28 +309,48 @@ def make_wrapper():
             subprocess_run(cmd)
     try:
         make()
-    except CalledProcessError:
+    except CalledProcessError as e:
         if isfile(join(sourcedir, '.config')
                   ) or isdir(join(sourcedir, 'include/config')):
             try:
                 print('=== Cleaning... ===')
                 cmd = 'make mrproper'
                 subprocess_run(cmd)
-            except CalledProcessError:
+            except CalledProcessError as e:
                 print('!!! Failed when cleaning, exiting... !!!')
-                raise
+                raise e
             else:
                 print('=== Re-runing the make again... ===')
                 make()
         else:
             reset()
             print('!!! Failed to make kernel image... !!!')
-            raise
+            raise e
     else:
         print()
         print('--- Successfully built... ---')
         print()
-        reset()
+        end = time()
+        result = str(round((end - start) / 60, 2)).split('.')
+        minutes = int(result[0])
+        seconds = int(result[1])
+        if seconds >= 60:
+            minutes = minutes + 1
+            seconds = seconds - 60
+        if minutes <= 1:
+            m_msg = 'minute'
+            h = '==========================================='
+        else:
+            m_msg = 'minutes'
+            h = '============================================'
+            if minutes >= 10 and seconds >= 10:
+                h = '============================================='
+        print(h)
+        print(f'--- build took {minutes} {m_msg}, and {seconds} seconds ---')
+        print(h)
+        print()
+        zip_now(finalzip)
+    reset()
 
 
 def modules():
@@ -366,7 +387,8 @@ def modules():
                 copy(join(moduledir, 'wlan.ko'
                           ), join(moduledir, 'pronto/pronto_wlan.ko'))
         else:
-            raise FileNotFoundError('!!! module not found... !!!')
+            print('!!! module not found... !!!')
+            raise FileNotFoundError
 
 
 def zip_now(zippath):
@@ -643,26 +665,6 @@ def main():
     P = Process(target=make_wrapper, name='make_kernel')
     P.start()
     P.join()
-    end = time()
-    result = str(round((end - start) / 60, 2)).split('.')
-    minutes = int(result[0])
-    seconds = int(result[1])
-    if seconds >= 60:
-        minutes = minutes + 1
-        seconds = seconds - 60
-    if minutes <= 1:
-        m_msg = 'minute'
-        h = '==========================================='
-    else:
-        m_msg = 'minutes'
-        h = '============================================'
-        if minutes >= 10:
-            h = '============================================='
-    print(h)
-    print(f'--- build took {minutes} {m_msg}, and {seconds} seconds ---')
-    print(h)
-    print()
-    zip_now(finalzip)
     if upload is True:
         print('==> Uploading...')
         Uploads(device, version, zipname, finalzip)

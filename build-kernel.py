@@ -313,18 +313,26 @@ def make_wrapper():
         if isfile(join(sourcedir, '.config')
                   ) or isdir(join(sourcedir, 'include/config')):
             try:
-                print('=== Cleaning... ===')
+                print()
+                print('Cleaning...')
+                print()
                 cmd = 'make mrproper'
                 subprocess_run(cmd)
             except CalledProcessError as e:
-                print('!!! Failed when cleaning, exiting... !!!')
+                print()
+                print('Failed when cleaning, exiting...')
+                print()
                 raise e
             else:
-                print('=== Re-runing the make again... ===')
+                print()
+                print('Re-runing make_kernel again...')
+                print()
                 make()
         else:
             reset()
-            print('!!! Failed to make kernel image... !!!')
+            print()
+            print('Failed to make kernel image...')
+            print()
             raise e
     else:
         print()
@@ -387,7 +395,9 @@ def modules():
                 copy(join(moduledir, 'wlan.ko'
                           ), join(moduledir, 'pronto/pronto_wlan.ko'))
         else:
-            print('!!! module not found... !!!')
+            print()
+            print('Module not found...')
+            print()
             raise FileNotFoundError
 
 
@@ -566,7 +576,7 @@ class GoogleDrive(object):
             if name == version and parent == parents_id:
                 folder_id = is_exists.get('id')
             else:
-                print('error out of range, can not seems to find existing folder.')
+                print('error, can not find existing folder...')
                 raise ValueError
         page_token = response.get('nextPageToken', None)
         return folder_id

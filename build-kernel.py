@@ -565,6 +565,9 @@ class GoogleDrive(object):
             parent = is_exists.get('parents')[0]
             if name == version and parent == parents_id:
                 folder_id = is_exists.get('id')
+            else:
+                print('error out of range, can not seems to find existing folder.')
+                raise ValueError
         page_token = response.get('nextPageToken', None)
         return folder_id
 

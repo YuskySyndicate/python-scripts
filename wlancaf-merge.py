@@ -56,6 +56,7 @@ def git_env():
 
 
 def parameters():
+    global wlan_type, merge_type, tag
     param = ArgumentParser(description='Wlan CAF driver updater/initial'
                                        'merging into Android kernel source', )
     param.add_argument('-W', '--wlan', choices=['qcacld', 'prima'],
@@ -70,11 +71,10 @@ def parameters():
     wlan_type = params['wlan']
     merge_type = params['init']
     tag = params['tag']
-    return wlan_type, merge_type, tag
 
 
 def repo():
-    wlan_type, merge_type, tag = parameters()
+    global repo_url, staging, subdir
     staging = 'drivers/staging'
     if wlan_type == 'qcacld':
         repo_url = {
@@ -92,12 +92,9 @@ def repo():
         repo_url = ('https://source.codeaurora.org/'
                     'quic/la/platform/vendor/qcom-opensource/wlan/prima/')
         subdir = 'prima'
-    return repo_url, staging, subdir
 
 
 def check():
-    wlan_type, merge_type, tag = parameters()
-    repo_url, staging, subdir = repo()
     if wlan_type == 'qcacld' and merge_type == 'initial':
         for subdirs in subdir:
             if isdir(join(staging, subdirs)):
@@ -114,8 +111,8 @@ def check():
             else:
                 return True
         else:
-            print('you might want to use --init initial, '
-                  'because those 3 are exists, '
+            print('\n' + 'You might want to use --init initial, '
+                  'because those three are exists, '
                   '\nor one of them is exist and not empty.')
             raise OSError
     elif wlan_type == 'qcacld' and merge_type == 'update':
@@ -134,15 +131,15 @@ def check():
             else:
                 continue
         else:
-            print('you might want to use --init update, '
-                  'because those 3 are not exists.'
-                  '\nor exists but one of them has an empty folder.')
+            print('\n' + 'You might want to use --init update, '
+                  "because those three aren't exists."
+                  '\nor exists but one of them has an empty folder.' + '\n')
             raise OSError
     elif wlan_type == 'prima' and merge_type == 'initial':
         if isdir(join(staging, subdir)):
             if listdir(join(staging, subdir)):
-                print('you might want to use --init update, '
-                      '\nbecause prima is exist and it is not empty.')
+                print('\n' + 'You might want to use --init update, '
+                      "\nbecause prima is exist and it's not empty." + '\n')
                 raise OSError
             else:
                 return True
@@ -153,21 +150,19 @@ def check():
             if listdir(join(staging, subdir)):
                 return True
             else:
-                print('folder prima exist, but it is just an empty folder.')
+                print("Folder prima exist, but it's just an empty folder.")
                 raise OSError
         else:
-            print('you might want to use --init initial, '
-                  'because prima is not exist.')
+            print('You might want to use --init initial, '
+                  "because prima isn't exist.")
             raise OSError
 
 
 def merge():
-    wlan_type, merge_type, tag = parameters()
-    repo_url, staging, subdir = repo()
     extra_cmd = git_env()
     if wlan_type == 'qcacld' and merge_type == 'initial':
         for repos in repo_url:
-            print("fetching %s with tag '%s'" % (repos, tag))
+            print("Fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch %s %s' % (repo_url[repos], tag)
             talk = subprocess_run(cmd)
             while True:
@@ -181,18 +176,18 @@ def merge():
                 for cmd in cmds:
                     talk = subprocess_run(cmd)
                     if cmd == cmds[0]:
-                        print('merging %s into kernel source...' % repos)
+                        print('Merging %s into kernel source...' % repos)
                     if cmd == cmds[2]:
-                        print('committing changes...')
+                        print('Committing changes...')
                         print('\n' + talk[0])
                 break
     elif wlan_type == 'qcacld' and merge_type == 'update':
         for repos in repo_url:
-            print("fetching %s with tag '%s'" % (repos, tag))
+            print("Fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch %s %s' % (repo_url[repos], tag)
             talk = subprocess_run(cmd)
             while True:
-                print('merging %s into kernel source and committing changes...'
+                print('Merging %s into kernel source and committing changes...'
                       % repos)
                 cmd = ('git merge -X subtree=drivers/staging/%s '
                        '--edit -m "%s: Merge tag \'%s\' into '
@@ -214,11 +209,11 @@ def merge():
         for cmd in cmds:
             talk = subprocess_run(cmd)
             if cmd == cmds[0]:
-                print("fetching %s with tag '%s'" % (wlan_type, tag))
+                print("Fetching %s with tag '%s'" % (wlan_type, tag))
             if cmd == cmds[1]:
-                print('merging %s into kernel source...' % wlan_type)
+                print('Merging %s into kernel source...' % wlan_type)
             if cmd == cmds[3]:
-                print('committing changes...')
+                print('Committing changes...')
         else:
             print('\n' + talk[0])
     elif wlan_type == 'prima' and merge_type == 'update':
@@ -232,9 +227,9 @@ def merge():
         for cmd in cmds:
             talk = subprocess_run(cmd)
             if cmd == cmds[0]:
-                print("fetching %s with tag '%s'" % (wlan_type, tag))
+                print("Fetching %s with tag '%s'" % (wlan_type, tag))
             if cmd == cmds[1]:
-                print('merging %s into kernel source and committing changes...'
+                print('Merging %s into kernel source and committing changes...'
                       % wlan_type)
         else:
             print('\n' + talk[0])
@@ -242,13 +237,12 @@ def merge():
 
 
 def main():
-    wlan_type, merge_type, tag = parameters()
-    repo_url, staging, subdir = repo()
+    repo()
     if not exists('Makefile'):
         print('Run this script inside your root kernel source.')
         raise OSError
-    if not exists('drivers/staging'):
-        print("staging folder can't be found, "
+    if not exists(staging):
+        print("Staging folder can't be found, "
               'are you sure running it inside kernel source?')
         raise OSError
     if check() is True:

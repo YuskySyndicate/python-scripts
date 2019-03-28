@@ -256,8 +256,7 @@ def IncludeToKconfig():
                 NewKconfig = ValueKconfig.replace(tempRemove, KconfigToInclude)
                 Kconfig.write(NewKconfig)
             cmds = ['git add drivers/staging/Kconfig',
-                    'git commit -m "%s: include it into Kconfig"'
-                    % wlan_type]
+                    'git commit -m "%s: include it into Kconfig"' % wlan_type]
             for cmd in cmds:
                 try:
                     subprocess_run(cmd)

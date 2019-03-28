@@ -236,6 +236,37 @@ def merge():
     return True
 
 
+def IncludeToKconfig():
+    if merge_type == 'initial':
+        tempRemove = 'endif # STAGING\n'
+        KconfigToInclude = None
+        if wlan_type == 'qcacld':
+            KconfigToInclude = ('source "drivers/staging/qcacld-3.0/Kconfig"'
+                                '\n\nendif # STAGING\n')
+            KconfigToCheck = 'source "drivers/staging/qcacld-3.0/Kconfig"'
+        elif wlan_type == 'prima':
+            KconfigToInclude = ('source "drivers/staging/prima/Kconfig"'
+                                '\n\nendif # STAGING\n')
+            KconfigToCheck = 'source "drivers/staging/prima/Kconfig"'
+        with open('drivers/staging/Kconfig', 'r') as Kconfig:
+            ValueKconfig = Kconfig.read()
+        if KconfigToCheck not in ValueKconfig:
+            print('Including %s into Kconfig...' % wlan_type)
+            with open('drivers/staging/Kconfig', 'w') as Kconfig:
+                NewKconfig = ValueKconfig.replace(tempRemove, KconfigToInclude)
+                Kconfig.write(NewKconfig)
+            cmds = ['git add drivers/staging/Kconfig',
+                    'git commit -m "%s: include it into Kconfig"'
+                    % wlan_type]
+            for cmd in cmds:
+                try:
+                    subprocess_run(cmd)
+                except CalledProcessError as err:
+                    break
+                    raise err
+    return
+
+
 def main():
     repo()
     if not exists('Makefile'):
@@ -246,7 +277,11 @@ def main():
               'are you sure running it inside kernel source?')
         raise OSError
     if check() is True:
-        merge()
+        try:
+            merge()
+        except CalledProcessError as err:
+            raise err
+        IncludeToKconfig()
 
 
 if __name__ == '__main__':

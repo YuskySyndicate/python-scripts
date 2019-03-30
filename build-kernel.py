@@ -6,8 +6,6 @@
 
 import sys
 import os
-import signal
-import psutil
 from datetime import datetime
 from argparse import ArgumentParser
 from subprocess import Popen, PIPE, CalledProcessError
@@ -110,16 +108,6 @@ def subprocess_run(cmd):
         # makes subproc.communicate() exit with NoneType status
         raise CalledProcessError(exitCode, cmd)
     return talk
-
-
-def kill_subprocess(parent_pid, sig=signal.SIGTERM):
-    try:
-        parent = psutil.Process(parent_pid)
-    except psutil.NoSuchProcess:
-        return
-    children = parent.children(recursive=True)
-    for process in children:
-        process.send_signal(sig)
 
 
 def variables():

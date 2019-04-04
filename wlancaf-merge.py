@@ -45,15 +45,15 @@ def git_env():
 
 def parameters():
     global wlan_type, merge_type, tag
-    param = ArgumentParser(description='Wlan CAF driver updater/initial'
-                                       'merging into Android kernel source', )
+    param = ArgumentParser(description='WLAN-CAF driver updater/initial '
+                                       'merge into android kernel source.', )
     param.add_argument('-W', '--wlan', choices=['qcacld', 'prima'],
-                       help='Your WLAN driver type either qcacld/prima.',
+                       help='Your wlan driver type, either qcacld or prima.',
                        required=True)
     param.add_argument('-I', '--init', choices=['update', 'initial'],
-                       help='Choose wether to update or initial merging.',
+                       help='Choose wether to update or initial merge.',
                        required=True)
-    param.add_argument('-T', '--tag', help='Your CAF tag you want to merge.',
+    param.add_argument('-T', '--tag', help='Your current/target CAF TAG.',
                        required=True)
     params = vars(param.parse_args())
     wlan_type = params['wlan']

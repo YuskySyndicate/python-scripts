@@ -236,21 +236,40 @@ def IncludeToKconfig():
             KconfigToInclude = ('source "drivers/staging/prima/Kconfig"'
                                 '\n\nendif # STAGING\n')
             KconfigToCheck = 'source "drivers/staging/prima/Kconfig"'
-        with open('drivers/staging/Kconfig', 'r') as Kconfig:
+        with open(join(staging, 'Kconfig'), 'r') as Kconfig:
             ValueKconfig = Kconfig.read()
         if KconfigToCheck not in ValueKconfig:
             print('Including %s into Kconfig...' % wlan_type)
-            with open('drivers/staging/Kconfig', 'w') as Kconfig:
+            with open(join(staging, 'Kconfig'), 'w') as Kconfig:
                 NewKconfig = ValueKconfig.replace(tempRemove, KconfigToInclude)
                 Kconfig.write(NewKconfig)
+            IncludeToMakefile()
             cmds = ['git add drivers/staging/Kconfig',
-                    'git commit -m "%s: include it into Kconfig"' % wlan_type]
+                    'git add drivers/staging/Makefile',
+                    'git commit -m "%s: include it into Source"' % wlan_type]
             for cmd in cmds:
                 try:
                     subprocess_run(cmd)
                 except CalledProcessError as err:
                     break
                     raise err
+    return
+
+
+def IncludeToMakefile():
+    if merge_type == 'initial':
+        with open(join(staging, 'Makefile'), 'r') as Makefile:
+            MakefileValue = Makefile.read()
+        if wlan_type == 'qcacld':
+            ValueToCheck = 'CONFIG_QCA_CLD_WLAN'
+            ValueToInclude = '\nobj-$(CONFIG_QCA_CLD_WLAN)	+= qcacld-3.0/'
+        elif wlan_type == 'prima':
+            ValueToCheck = 'CONFIG_PRONTO_WLAN'
+            ValueToInclude = '\nobj-$(CONFIG_PRONTO_WLAN)	+= prima/'
+        if ValueToCheck not in MakefileValue:
+            print('Including %s into Makefile...' % wlan_type)
+            with open(join(staging, 'Makefile'), 'a') as Makefile:
+                Makefile.write(ValueToInclude)
     return
 
 

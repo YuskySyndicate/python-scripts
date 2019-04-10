@@ -262,10 +262,10 @@ def IncludeToMakefile():
             MakefileValue = Makefile.read()
         if wlan_type == 'qcacld':
             ValueToCheck = 'CONFIG_QCA_CLD_WLAN'
-            ValueToInclude = '\nobj-$(CONFIG_QCA_CLD_WLAN)	+= qcacld-3.0/'
+            ValueToInclude = '\nobj-$(CONFIG_QCA_CLD_WLAN)\t+= qcacld-3.0/'
         elif wlan_type == 'prima':
             ValueToCheck = 'CONFIG_PRONTO_WLAN'
-            ValueToInclude = '\nobj-$(CONFIG_PRONTO_WLAN)	+= prima/'
+            ValueToInclude = '\nobj-$(CONFIG_PRONTO_WLAN)\t+= prima/'
         if ValueToCheck not in MakefileValue:
             print('Including %s into Makefile...' % wlan_type)
             with open(join(staging, 'Makefile'), 'a') as Makefile:

@@ -34,9 +34,8 @@ def git_env():
     cmd = 'git --version | cut -d " " -f3 | head -n1 | tr -d "\n"'
     talk = subprocess_run(cmd)
     version = talk[0].strip().split('.')
-    major_version = int(version[0])
-    sub_version = int(version[1])
-    if major_version >= 2 and sub_version >= 9:
+    git_version = (int(version[0]), int(version[1]))
+    if git_version >= (2, 9):
         extra_cmd = '--allow-unrelated-histories'
     else:
         extra_cmd = ''

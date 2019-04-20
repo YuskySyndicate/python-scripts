@@ -9,10 +9,13 @@
 
 from __future__ import print_function
 
+import os
+import sys
 from argparse import ArgumentParser
 from os import listdir
 from os.path import isdir, exists, join
 from subprocess import PIPE, Popen, CalledProcessError
+from tempfile import mkstemp
 
 
 def subprocess_run(cmd):
@@ -158,7 +161,7 @@ def merge():
                     ('git read-tree --prefix=drivers/staging/%s '
                      '-u FETCH_HEAD' % repos),
                     ('git commit -m "%s: Merge init tag \'%s\' into '
-                     '`git rev-parse --abbrev-ref HEAD`"' % (repos, tag))
+                     '$(git rev-parse --abbrev-ref HEAD)"' % (repos, tag))
                 ]
                 for cmd in cmds:
                     talk = subprocess_run(cmd)
@@ -171,18 +174,23 @@ def merge():
     elif wlan_type == 'qcacld' and merge_type == 'update':
         for repos in repo_url:
             print("Fetching %s with tag '%s'" % (repos, tag))
-            cmd = 'git fetch %s %s' % (repo_url[repos], tag)
+            cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             talk = subprocess_run(cmd)
+            merge_msg = create_merge_message()
             while True:
                 print('Merging %s into kernel source and committing changes...'
                       % repos)
                 cmd = ('git merge -X subtree=drivers/staging/%s '
-                       '--edit -m "%s: Merge tag \'%s\' into '
-                       '`git rev-parse --abbrev-ref HEAD`" '
-                       'FETCH_HEAD --no-edit'
-                       % (repos, repos, tag))
+                       '--edit -m "%s: %s" FETCH_HEAD --no-edit'
+                       % (repos, repos, merge_msg))
                 talk = subprocess_run(cmd)
-                print('\n' + talk[0])
+                if sys.version_info[0] < 3:
+                    # Somehow py2 loop repo from 1 to 3 leaving 2 running last
+                    if repos != 'qca-wifi-host-cmn':
+                        print()
+                else:
+                    if repos != 'qcacld-3.0':
+                        print()
                 break
     elif wlan_type == 'prima' and merge_type == 'initial':
         cmds = [
@@ -191,7 +199,7 @@ def merge():
             ('git read-tree --prefix=drivers/staging/%s '
              '-u FETCH_HEAD' % wlan_type),
             ('git commit -m "%s: Merge init tag \'%s\' into '
-             '`git rev-parse --abbrev-ref HEAD`"' % (wlan_type, tag))
+             '$(git rev-parse --abbrev-ref HEAD)"' % (wlan_type, tag))
         ]
         for cmd in cmds:
             talk = subprocess_run(cmd)
@@ -204,12 +212,12 @@ def merge():
         else:
             print('\n' + talk[0])
     elif wlan_type == 'prima' and merge_type == 'update':
+        merge_msg = create_merge_message()
         cmds = [
-            'git fetch %s %s' % (repo_url, tag),
+            'git fetch --tags -f %s %s' % (repo_url, tag),
             ('git merge -X subtree=drivers/staging/%s '
-             '--edit -m "%s: Merge tag \'%s\' into '
-             '`git rev-parse --abbrev-ref HEAD`" FETCH_HEAD --no-edit'
-             % (wlan_type, wlan_type, tag))
+             '--edit -m "%s: %s" FETCH_HEAD --no-edit'
+             % (wlan_type, wlan_type, merge_msg))
         ]
         for cmd in cmds:
             talk = subprocess_run(cmd)
@@ -223,7 +231,7 @@ def merge():
     return True
 
 
-def IncludeToKconfig():
+def include_to_kconfig():
     if merge_type == 'initial':
         tempRemove = 'endif # STAGING\n'
         KconfigToInclude = None
@@ -242,7 +250,7 @@ def IncludeToKconfig():
             with open(join(staging, 'Kconfig'), 'w') as Kconfig:
                 NewKconfig = ValueKconfig.replace(tempRemove, KconfigToInclude)
                 Kconfig.write(NewKconfig)
-            IncludeToMakefile()
+            include_to_makefile()
             cmds = ['git add drivers/staging/Kconfig',
                     'git add drivers/staging/Makefile',
                     'git commit -m "%s: include it into Source"' % wlan_type]
@@ -255,7 +263,7 @@ def IncludeToKconfig():
     return
 
 
-def IncludeToMakefile():
+def include_to_makefile():
     if merge_type == 'initial':
         with open(join(staging, 'Makefile'), 'r') as Makefile:
             MakefileValue = Makefile.read()
@@ -272,7 +280,52 @@ def IncludeToMakefile():
     return
 
 
+def get_previous_tag():
+    revision = tag.split('-')[0] + '-'
+    cmd = 'git tag -l "%s*"' % revision
+    talk = subprocess_run(cmd)
+    list_tag = talk[0].split()
+    if list_tag[-1] == tag:
+        previous_tag = list_tag[-2]
+    else:
+        previous_tag = None
+    return previous_tag
+
+
+def create_merge_message():
+    temp_merge_msg = mkstemp()[1]
+    previous_tag = get_previous_tag()
+    if previous_tag is not None and merge_type == 'update':
+        range = 'refs/tags/%s..refs/tags/%s' % (previous_tag, tag)
+        cmds = [
+            'git rev-parse --abbrev-ref HEAD',
+            'git rev-list --count %s' % range,
+            ('git log --oneline --pretty=format:"        %s" "%s"'
+             % ('%s', range))
+        ]
+        for cmd in cmds:
+            talk = subprocess_run(cmd)
+            if cmd == cmds[0]:
+                branch = talk[0].strip('\n')
+            if cmd == cmds[1]:
+                total_changes = talk[0].strip('\n')
+            if cmd == cmds[2]:
+                commits = talk[0]
+        with open(temp_merge_msg, 'w') as commit_msg:
+            commit_msg.write("Merge tag '%s' into %s" % (tag, branch))
+            commit_msg.writelines('\n' + '\n')
+            commit_msg.write("Changes in tag '%s': (%s commits)"
+                             % (tag, total_changes))
+            commit_msg.writelines('\n')
+            commit_msg.write(commits)
+        with open(temp_merge_msg, 'r') as commit_msg:
+            merge_msg = commit_msg.read()
+    os.remove(temp_merge_msg)
+    return merge_msg
+
+
 def main():
+    print()
     repo()
     if not exists('Makefile'):
         print('Run this script inside your root kernel source.')
@@ -286,7 +339,7 @@ def main():
             merge()
         except CalledProcessError as err:
             raise err
-        IncludeToKconfig()
+        include_to_kconfig()
 
 
 if __name__ == '__main__':

@@ -21,7 +21,6 @@ from tempfile import mkstemp
 def subprocess_run(cmd):
     subproc = Popen(cmd, stdout=PIPE, stderr=PIPE,
                     shell=True, universal_newlines=True)
-    subproc.wait()
     talk = subproc.communicate()
     exitCode = subproc.returncode
     if exitCode != 0:
@@ -29,7 +28,15 @@ def subprocess_run(cmd):
               'exit code: %d\n'
               'stdout: %s\n'
               'stderr: %s' % (exitCode, talk[0], talk[1]))
-        raise CalledProcessError(exitCode, cmd)
+        if 'CONFLICT' in talk[0]:
+            if 'Recorded preimage for' in talk[1]:
+                print('Merge needs manual intervention!.')
+                print('Resolve conflict(s) and `git commit` if you were done.')
+                sys.exit(exitCode)
+        else:
+            raise CalledProcessError(exitCode, cmd)
+        if exists(temp_merge_msg):
+            os.remove(temp_merge_msg)
     return talk
 
 
@@ -153,29 +160,35 @@ def merge():
     if wlan_type == 'qcacld' and merge_type == 'initial':
         for repos in repo_url:
             print("Fetching %s with tag '%s'" % (repos, tag))
-            cmd = 'git fetch %s %s' % (repo_url[repos], tag)
-            talk = subprocess_run(cmd)
+            cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
+            subprocess_run(cmd)
+            merge_msg = create_merge_message()
             while True:
                 cmds = [
                     'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd,
                     ('git read-tree --prefix=drivers/staging/%s '
                      '-u FETCH_HEAD' % repos),
-                    ('git commit -m "%s: Merge init tag \'%s\' into '
-                     '$(git rev-parse --abbrev-ref HEAD)"' % (repos, tag))
+                    ('git commit --file %s --no-edit --quiet'
+                     % (temp_merge_msg))
                 ]
                 for cmd in cmds:
-                    talk = subprocess_run(cmd)
+                    subprocess_run(cmd)
                     if cmd == cmds[0]:
                         print('Merging %s into kernel source...' % repos)
                     if cmd == cmds[2]:
                         print('Committing changes...')
-                        print('\n' + talk[0])
+                        if sys.version_info[0] < 3:
+                            if repos != 'qca-wifi-host-cmn':
+                                print()
+                        else:
+                            if repos != 'qcacld-3.0':
+                                print()
                 break
     elif wlan_type == 'qcacld' and merge_type == 'update':
         for repos in repo_url:
             print("Fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
-            talk = subprocess_run(cmd)
+            subprocess_run(cmd)
             merge_msg = create_merge_message()
             while True:
                 print('Merging %s into kernel source and committing changes...'
@@ -183,7 +196,7 @@ def merge():
                 cmd = ('git merge -X subtree=drivers/staging/%s '
                        '--edit -m "%s: %s" FETCH_HEAD --no-edit'
                        % (repos, repos, merge_msg))
-                talk = subprocess_run(cmd)
+                subprocess_run(cmd)
                 if sys.version_info[0] < 3:
                     # Somehow py2 loop repo from 1 to 3 leaving 2 running last
                     if repos != 'qca-wifi-host-cmn':
@@ -193,41 +206,37 @@ def merge():
                         print()
                 break
     elif wlan_type == 'prima' and merge_type == 'initial':
+        merge_msg = create_merge_message()
         cmds = [
-            'git fetch %s %s' % (repo_url, tag),
+            'git fetch --tags -f %s %s' % (repo_url, tag),
             'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd,
             ('git read-tree --prefix=drivers/staging/%s '
              '-u FETCH_HEAD' % wlan_type),
-            ('git commit -m "%s: Merge init tag \'%s\' into '
-             '$(git rev-parse --abbrev-ref HEAD)"' % (wlan_type, tag))
+            'git commit --file %s --no-edit --quiet' % (temp_merge_msg)
         ]
         for cmd in cmds:
-            talk = subprocess_run(cmd)
+            subprocess_run(cmd)
             if cmd == cmds[0]:
                 print("Fetching %s with tag '%s'" % (wlan_type, tag))
             if cmd == cmds[1]:
                 print('Merging %s into kernel source...' % wlan_type)
             if cmd == cmds[3]:
                 print('Committing changes...')
-        else:
-            print('\n' + talk[0])
     elif wlan_type == 'prima' and merge_type == 'update':
         merge_msg = create_merge_message()
         cmds = [
             'git fetch --tags -f %s %s' % (repo_url, tag),
-            ('git merge -X subtree=drivers/staging/%s '
-             '--edit -m "%s: %s" FETCH_HEAD --no-edit'
+            ("git merge -X subtree=drivers/staging/%s "
+             "--edit -m '%s: %s' FETCH_HEAD --no-edit"
              % (wlan_type, wlan_type, merge_msg))
         ]
         for cmd in cmds:
-            talk = subprocess_run(cmd)
+            subprocess_run(cmd)
             if cmd == cmds[0]:
                 print("Fetching %s with tag '%s'" % (wlan_type, tag))
             if cmd == cmds[1]:
                 print('Merging %s into kernel source and committing changes...'
                       % wlan_type)
-        else:
-            print('\n' + talk[0])
     return True
 
 
@@ -285,42 +294,64 @@ def get_previous_tag():
     cmd = 'git tag -l "%s*"' % revision
     talk = subprocess_run(cmd)
     list_tag = talk[0].split()
-    if list_tag[-1] == tag:
-        previous_tag = list_tag[-2]
-    else:
+    try:
+        list_tag[-1]
+    except IndexError:
         previous_tag = None
+    else:
+        if list_tag[-1] == tag:
+            previous_tag = list_tag[-2]
+        else:
+            previous_tag = None  # Even though this shouldn't be execute
     return previous_tag
 
 
 def create_merge_message():
+    global temp_merge_msg
     temp_merge_msg = mkstemp()[1]
     previous_tag = get_previous_tag()
+    tags = 'None'
+    cmds = [
+            'git rev-parse --abbrev-ref HEAD',
+            'git rev-list --count %s' % tags,
+            ('git log --oneline --pretty=format:"        %s" "%s"'
+             % ('%s', tags))
+    ]
     if previous_tag is not None and merge_type == 'update':
         range = 'refs/tags/%s..refs/tags/%s' % (previous_tag, tag)
-        cmds = [
-            'git rev-parse --abbrev-ref HEAD',
-            'git rev-list --count %s' % range,
-            ('git log --oneline --pretty=format:"        %s" "%s"'
-             % ('%s', range))
-        ]
-        for cmd in cmds:
-            talk = subprocess_run(cmd)
-            if cmd == cmds[0]:
-                branch = talk[0].strip('\n')
-            if cmd == cmds[1]:
-                total_changes = talk[0].strip('\n')
-            if cmd == cmds[2]:
-                commits = talk[0]
-        with open(temp_merge_msg, 'w') as commit_msg:
-            commit_msg.write("Merge tag '%s' into %s" % (tag, branch))
-            commit_msg.writelines('\n' + '\n')
-            commit_msg.write("Changes in tag '%s': (%s commits)"
-                             % (tag, total_changes))
-            commit_msg.writelines('\n')
-            commit_msg.write(commits)
-        with open(temp_merge_msg, 'r') as commit_msg:
-            merge_msg = commit_msg.read()
-    os.remove(temp_merge_msg)
+        for cmd, value in enumerate(cmds):
+            cmds[cmd] = value.replace(tags, range)
+    else:
+        for cmd, value in enumerate(cmds):
+            cmds[cmd] = value.replace(tags, tag)
+        if merge_type == 'initial':
+            # don't add all commit changes in initial
+            command = ('git log --oneline --pretty=oneline -45 --pretty=format'
+                       ':"        %s" "%s"' % ('%s', tag))
+            for cmd, value in enumerate(cmds):
+                cmds[cmd] = value.replace(cmds[2], command)
+    for cmd in cmds:
+        talk = subprocess_run(cmd)
+        if cmd == cmds[0]:
+            branch = talk[0].strip('\n')
+        if cmd == cmds[1]:
+            total_changes = talk[0].strip('\n')
+        if cmd == cmds[2]:
+            commits = talk[0]
+    with open(temp_merge_msg, 'w') as commit_msg:
+        commit_msg.write("Merge tag '%s' into %s" % (tag, branch))
+        commit_msg.writelines('\n' + '\n')
+        if merge_type == 'initial':
+            commit_msg.write('This is an initial merged, '
+                             "all commit changes will not be written fully.\n")
+        commit_msg.write("Changes in tag '%s': (%s commits)"
+                         % (tag, total_changes))
+        commit_msg.writelines('\n')
+        commit_msg.write(commits)
+        if merge_type == 'initial':
+            commit_msg.write('\n' + '        ...')
+    with open(temp_merge_msg, 'r') as commit_msg:
+        merge_msg = commit_msg.read()
     return merge_msg
 
 
@@ -335,10 +366,9 @@ def main():
               'are you sure running it inside kernel source?')
         raise OSError
     if check() is True:
-        try:
-            merge()
-        except CalledProcessError as err:
-            raise err
+        merge()
+        if exists(temp_merge_msg):
+            os.remove(temp_merge_msg)
         include_to_kconfig()
 
 

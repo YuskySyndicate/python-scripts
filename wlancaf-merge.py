@@ -28,14 +28,14 @@ def subprocess_run(cmd):
               'exit code: %d\n'
               'stdout: %s\n'
               'stderr: %s' % (exitCode, talk[0], talk[1]))
+        if exists(merge_msg_file):
+            os.remove(merge_msg_file)
         if 'CONFLICT' in talk[0]:
             print('Merge needs manual intervention!.')
             print('Resolve conflict(s) and `git commit` if you are done.')
             sys.exit(exitCode)
         else:
             raise CalledProcessError(exitCode, cmd)
-        if exists(temp_merge_msg):
-            os.remove(temp_merge_msg)
     return talk
 
 
@@ -168,7 +168,7 @@ def merge():
                     ('git read-tree --prefix=drivers/staging/%s '
                      '-u FETCH_HEAD' % repos),
                     ('git commit --file %s --no-edit --quiet'
-                     % (temp_merge_msg))
+                     % merge_msg)
                 ]
                 for cmd in cmds:
                     subprocess_run(cmd)
@@ -182,6 +182,8 @@ def merge():
                         else:
                             if repos != 'qcacld-3.0':
                                 print()
+                if exists(merge_msg):
+                    os.remove(merge_msg)
                 break
     elif wlan_type == 'qcacld' and merge_type == 'update':
         for repos in repo_url:
@@ -192,10 +194,13 @@ def merge():
             while True:
                 print('Merging %s into kernel source and committing changes...'
                       % repos)
-                cmd = ('git merge -X subtree=drivers/staging/%s '
-                       '--edit -m "%s: %s" FETCH_HEAD --no-edit'
-                       % (repos, repos, merge_msg))
-                subprocess_run(cmd)
+                cmds = [
+                    ('git merge -X subtree=drivers/staging/%s FETCH_HEAD --no-edit'
+                     % repos),
+                    'git commit --amend --file %s --no-edit --quiet' % merge_msg
+                ]
+                for cmd in cmds:
+                    subprocess_run(cmd)
                 if sys.version_info[0] < 3:
                     # Somehow py2 loop repo from 1 to 3 leaving 2 running last
                     if repos != 'qca-wifi-host-cmn':
@@ -203,6 +208,8 @@ def merge():
                 else:
                     if repos != 'qcacld-3.0':
                         print()
+                if exists(merge_msg):
+                    os.remove(merge_msg)
                 break
     elif wlan_type == 'prima' and merge_type == 'initial':
         merge_msg = create_merge_message()
@@ -211,7 +218,7 @@ def merge():
             'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd,
             ('git read-tree --prefix=drivers/staging/%s '
              '-u FETCH_HEAD' % wlan_type),
-            'git commit --file %s --no-edit --quiet' % (temp_merge_msg)
+            'git commit --file %s --no-edit --quiet' % (merge_msg)
         ]
         for cmd in cmds:
             subprocess_run(cmd)
@@ -225,9 +232,9 @@ def merge():
         merge_msg = create_merge_message()
         cmds = [
             'git fetch --tags -f %s %s' % (repo_url, tag),
-            ("git merge -X subtree=drivers/staging/%s "
-             "--edit -m '%s: %s' FETCH_HEAD --no-edit"
-             % (wlan_type, wlan_type, merge_msg))
+            ("git merge -X subtree=drivers/staging/%s FETCH_HEAD --no-edit"
+             % wlan_type),
+            'git commit --amend --file %s --no-edit --quiet' % merge_msg
         ]
         for cmd in cmds:
             subprocess_run(cmd)
@@ -236,6 +243,8 @@ def merge():
             if cmd == cmds[1]:
                 print('Merging %s into kernel source and committing changes...'
                       % wlan_type)
+    if exists(merge_msg):
+            os.remove(merge_msg)
     return True
 
 
@@ -306,8 +315,9 @@ def get_previous_tag():
 
 
 def create_merge_message():
-    global temp_merge_msg
-    temp_merge_msg = mkstemp()[1]
+    global merge_msg_file
+    merge_msg = mkstemp()[1]
+    merge_msg_file = merge_msg
     previous_tag = get_previous_tag()
     tags = 'None'
     cmds = [
@@ -337,7 +347,7 @@ def create_merge_message():
             total_changes = talk[0].strip('\n')
         if cmd == cmds[2]:
             commits = talk[0]
-    with open(temp_merge_msg, 'w') as commit_msg:
+    with open(merge_msg, 'w') as commit_msg:
         commit_msg.write("Merge tag '%s' into %s" % (tag, branch))
         commit_msg.writelines('\n' + '\n')
         if merge_type == 'initial':
@@ -349,8 +359,6 @@ def create_merge_message():
         commit_msg.write(commits)
         if merge_type == 'initial':
             commit_msg.write('\n' + '        ...')
-    with open(temp_merge_msg, 'r') as commit_msg:
-        merge_msg = commit_msg.read()
     return merge_msg
 
 
@@ -366,9 +374,9 @@ def main():
         raise OSError
     if check() is True:
         merge()
-        if exists(temp_merge_msg):
-            os.remove(temp_merge_msg)
         include_to_kconfig()
+    if exists(merge_msg_file):
+        os.remove(merge_msg_file)
 
 
 if __name__ == '__main__':

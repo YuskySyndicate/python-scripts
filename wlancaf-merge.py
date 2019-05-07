@@ -29,10 +29,9 @@ def subprocess_run(cmd):
               'stdout: %s\n'
               'stderr: %s' % (exitCode, talk[0], talk[1]))
         if 'CONFLICT' in talk[0]:
-            if 'Recorded preimage for' in talk[1]:
-                print('Merge needs manual intervention!.')
-                print('Resolve conflict(s) and `git commit` if you were done.')
-                sys.exit(exitCode)
+            print('Merge needs manual intervention!.')
+            print('Resolve conflict(s) and `git commit` if you are done.')
+            sys.exit(exitCode)
         else:
             raise CalledProcessError(exitCode, cmd)
         if exists(temp_merge_msg):

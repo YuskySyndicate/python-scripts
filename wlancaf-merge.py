@@ -3,9 +3,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Copyright (C) 2019 Adek Maulana
-#
-# A simple script to add/update QCACLD or PRIMA into/for your,
-# Android kernel source. *only qcacld-3.0 and prima were supported.
+
+'''
+A simple script to add/update wlan driver QCACLD or PRIMA into/for your,
+Android kernel source. *only qcacld-3.0 and prima were supported.
+'''
 
 from __future__ import print_function
 
@@ -30,6 +32,8 @@ def subprocess_run(cmd):
               'stderr: %s' % (exitCode, talk[0], talk[1]))
         if exists(merge_msg_file):
             os.remove(merge_msg_file)
+        if exists('/tmp/merge-message'):
+            os.remove('/tmp/merge-message')
         if 'CONFLICT' in talk[0]:
             print('Merge needs manual intervention!.')
             print('Resolve conflict(s) and `git commit` if you are done.')
@@ -75,18 +79,20 @@ def repo():
     if wlan_type == 'qcacld':
         repo_url = {
             'fw-api': ('https://source.codeaurora.org/'
-                       'quic/la/platform/vendor/qcom-opensource/wlan/fw-api/'),
+                       'quic/la/platform/vendor/qcom-opensource/wlan/fw-api'),
             'qca-wifi-host-cmn': ('https://source.codeaurora.org/'
                                   'quic/la/platform/vendor/qcom-opensource/'
-                                  'wlan/qca-wifi-host-cmn/'),
+                                  'wlan/qca-wifi-host-cmn'),
             'qcacld-3.0': ('https://source.codeaurora.org/'
                            'quic/la/platform/vendor/qcom-opensource/wlan/'
                            'qcacld-3.0')
         }
         subdir = ['fw-api', 'qca-wifi-host-cmn', 'qcacld-3.0']
     elif wlan_type == 'prima':
-        repo_url = ('https://source.codeaurora.org/'
-                    'quic/la/platform/vendor/qcom-opensource/wlan/prima/')
+        repo_url = {
+            'prima': ('https://source.codeaurora.org/'
+                      'quic/la/platform/vendor/qcom-opensource/wlan/prima')
+        }
         subdir = 'prima'
 
 
@@ -156,19 +162,24 @@ def check():
 
 def merge():
     extra_cmd = git_env()
-    if wlan_type == 'qcacld' and merge_type == 'initial':
+    merge_message = '/tmp/merge-message'
+    if merge_type == 'initial':
         for repos in repo_url:
             print("Fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
             merge_msg = create_merge_message()
+            with open(merge_msg, 'r') as commit_file:
+                commit = commit_file.read()
+                with open(merge_message, 'w+') as commit_file:
+                    commit_file.write('%s: ' % repos + commit)
             while True:
                 cmds = [
                     'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd,
                     ('git read-tree --prefix=drivers/staging/%s '
                      '-u FETCH_HEAD' % repos),
                     ('git commit --file %s --no-edit --quiet'
-                     % merge_msg)
+                     % merge_message)
                 ]
                 for cmd in cmds:
                     subprocess_run(cmd)
@@ -176,76 +187,48 @@ def merge():
                         print('Merging %s into kernel source...' % repos)
                     if cmd == cmds[2]:
                         print('Committing changes...')
-                        if sys.version_info[0] < 3:
-                            if repos != 'qca-wifi-host-cmn':
-                                print()
-                        else:
-                            if repos != 'qcacld-3.0':
-                                print()
+                        if wlan_type != 'prima':
+                            print()
                 if exists(merge_msg):
                     os.remove(merge_msg)
+                if exists(merge_message):
+                    os.remove(merge_message)
                 break
-    elif wlan_type == 'qcacld' and merge_type == 'update':
+    elif merge_type == 'update':
         for repos in repo_url:
             print("Fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
             merge_msg = create_merge_message()
+            with open(merge_msg, 'r') as commit_file:
+                commit = commit_file.read()
+                with open(merge_message, 'w') as commit_file:
+                    commit_file.write('%s: ' % repos + commit)
             while True:
-                print('Merging %s into kernel source and committing changes...'
+                print('Merging %s into kernel source...'
                       % repos)
                 cmds = [
-                    ('git merge -X subtree=drivers/staging/%s FETCH_HEAD --no-edit'
-                     % repos),
-                    'git commit --amend --file %s --no-edit --quiet' % merge_msg
+                    ('git merge -X subtree=drivers/staging/%s FETCH_HEAD '
+                     '--no-edit' % repos),
+                    ('git commit --amend --file %s --no-edit --quiet'
+                     % merge_msg)
                 ]
+                print('Committing changes...')
                 for cmd in cmds:
                     subprocess_run(cmd)
                 if sys.version_info[0] < 3:
                     # Somehow py2 loop repo from 1 to 3 leaving 2 running last
-                    if repos != 'qca-wifi-host-cmn':
+                    if repos != 'qca-wifi-host-cmn' and wlan_type == 'qcacld':
                         print()
                 else:
-                    if repos != 'qcacld-3.0':
+                    if repos != 'qcacld-3.0' and wlan_type == 'qcacld':
                         print()
                 if exists(merge_msg):
                     os.remove(merge_msg)
+                if exists(merge_message):
+                    os.remove(merge_message)
                 break
-    elif wlan_type == 'prima' and merge_type == 'initial':
-        merge_msg = create_merge_message()
-        cmds = [
-            'git fetch --tags -f %s %s' % (repo_url, tag),
-            'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd,
-            ('git read-tree --prefix=drivers/staging/%s '
-             '-u FETCH_HEAD' % wlan_type),
-            'git commit --file %s --no-edit --quiet' % (merge_msg)
-        ]
-        for cmd in cmds:
-            subprocess_run(cmd)
-            if cmd == cmds[0]:
-                print("Fetching %s with tag '%s'" % (wlan_type, tag))
-            if cmd == cmds[1]:
-                print('Merging %s into kernel source...' % wlan_type)
-            if cmd == cmds[3]:
-                print('Committing changes...')
-    elif wlan_type == 'prima' and merge_type == 'update':
-        merge_msg = create_merge_message()
-        cmds = [
-            'git fetch --tags -f %s %s' % (repo_url, tag),
-            ("git merge -X subtree=drivers/staging/%s FETCH_HEAD --no-edit"
-             % wlan_type),
-            'git commit --amend --file %s --no-edit --quiet' % merge_msg
-        ]
-        for cmd in cmds:
-            subprocess_run(cmd)
-            if cmd == cmds[0]:
-                print("Fetching %s with tag '%s'" % (wlan_type, tag))
-            if cmd == cmds[1]:
-                print('Merging %s into kernel source and committing changes...'
-                      % wlan_type)
-    if exists(merge_msg):
-            os.remove(merge_msg)
-    return True
+    return
 
 
 def include_to_kconfig():
@@ -263,7 +246,7 @@ def include_to_kconfig():
         with open(join(staging, 'Kconfig'), 'r') as Kconfig:
             ValueKconfig = Kconfig.read()
         if KconfigToCheck not in ValueKconfig:
-            print('Including %s into Kconfig...' % wlan_type)
+            print('Including %s into kernel source...' % wlan_type)
             with open(join(staging, 'Kconfig'), 'w') as Kconfig:
                 NewKconfig = ValueKconfig.replace(tempRemove, KconfigToInclude)
                 Kconfig.write(NewKconfig)
@@ -291,7 +274,6 @@ def include_to_makefile():
             ValueToCheck = 'CONFIG_PRONTO_WLAN'
             ValueToInclude = '\nobj-$(CONFIG_PRONTO_WLAN)\t+= prima/'
         if ValueToCheck not in MakefileValue:
-            print('Including %s into Makefile...' % wlan_type)
             with open(join(staging, 'Makefile'), 'a') as Makefile:
                 Makefile.write(ValueToInclude)
     return
@@ -330,10 +312,9 @@ def create_merge_message():
         range = 'refs/tags/%s..refs/tags/%s' % (previous_tag, tag)
         for cmd, value in enumerate(cmds):
             cmds[cmd] = value.replace(tags, range)
-    else:
+    elif merge_type == 'initial':
         for cmd, value in enumerate(cmds):
             cmds[cmd] = value.replace(tags, tag)
-        if merge_type == 'initial':
             # don't add all commit changes in initial
             command = ('git log --oneline --pretty=oneline -45 --pretty=format'
                        ':"        %s" "%s"' % ('%s', tag))
@@ -348,7 +329,10 @@ def create_merge_message():
         if cmd == cmds[2]:
             commits = talk[0]
     with open(merge_msg, 'w') as commit_msg:
-        commit_msg.write("Merge tag '%s' into %s" % (tag, branch))
+        if merge_type == 'initial':
+            commit_msg.write("Initial tag '%s' into %s" % (tag, branch))
+        else:
+            commit_msg.write("Merge tag '%s' into %s" % (tag, branch))
         commit_msg.writelines('\n' + '\n')
         if merge_type == 'initial':
             commit_msg.write('This is an initial merged, '
@@ -375,8 +359,6 @@ def main():
     if check() is True:
         merge()
         include_to_kconfig()
-    if exists(merge_msg_file):
-        os.remove(merge_msg_file)
 
 
 if __name__ == '__main__':

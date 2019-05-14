@@ -315,11 +315,11 @@ def create_merge_message():
     elif merge_type == 'initial':
         for cmd, value in enumerate(cmds):
             cmds[cmd] = value.replace(tags, tag)
-            # don't add all commit changes in initial
-            command = ('git log --oneline --pretty=oneline -45 --pretty=format'
-                       ':"        %s" "%s"' % ('%s', tag))
-            for cmd, value in enumerate(cmds):
-                cmds[cmd] = value.replace(cmds[2], command)
+        # don't add all commit changes in initial
+        command = ('git log --oneline --pretty=oneline -45 --pretty=format'
+                   ':"        %s" "%s"' % ('%s', tag))
+        for cmd, value in enumerate(cmds):
+            cmds[cmd] = value.replace(cmds[2], command)
     for cmd in cmds:
         talk = subprocess_run(cmd)
         if cmd == cmds[0]:

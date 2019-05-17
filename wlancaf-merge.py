@@ -187,8 +187,7 @@ def merge():
                         print('Merging %s into kernel source...' % repos)
                     if cmd == cmds[2]:
                         print('Committing changes...')
-                        if wlan_type != 'prima':
-                            print()
+                        print()
                 if exists(merge_msg):
                     os.remove(merge_msg)
                 if exists(merge_message):
@@ -217,12 +216,13 @@ def merge():
                 for cmd in cmds:
                     subprocess_run(cmd)
                 if sys.version_info[0] < 3:
+                    if wlan_type == 'qcacld':
                     # Somehow py2 loop repo from 1 to 3 leaving 2 running last
-                    if repos != 'qca-wifi-host-cmn' and wlan_type == 'qcacld':
-                        print()
-                else:
-                    if repos != 'qcacld-3.0' and wlan_type == 'qcacld':
-                        print()
+                        if repos != 'qca-wifi-host-cmn':
+                            print()
+                        else:
+                        if repos != 'qcacld-3.0':
+                            print()
                 if exists(merge_msg):
                     os.remove(merge_msg)
                 if exists(merge_message):

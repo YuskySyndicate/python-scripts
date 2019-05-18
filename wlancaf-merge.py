@@ -215,12 +215,12 @@ def merge():
                 print('Committing changes...')
                 for cmd in cmds:
                     subprocess_run(cmd)
-                if sys.version_info[0] < 3:
-                    if wlan_type == 'qcacld':
-                    # Somehow py2 loop repo from 1 to 3 leaving 2 running last
+                if wlan_type == 'qcacld':
+                # Somehow py2 loop repo from 1 to 3 leaving 2 running last
+                    if sys.version_info[0] < 3:
                         if repos != 'qca-wifi-host-cmn':
                             print()
-                        else:
+                    else:
                         if repos != 'qcacld-3.0':
                             print()
                 if exists(merge_msg):

@@ -168,7 +168,7 @@ def merge():
             print("Fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
-            merge_msg = create_merge_message()
+            SKIP, merge_msg = create_merge_message()
             if SKIP is not True:
                 with open(merge_msg, 'r') as commit_file:
                     commit = commit_file.read()
@@ -204,7 +204,7 @@ def merge():
             print("Fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
-            merge_msg = create_merge_message()
+            SKIP, merge_msg = create_merge_message()
             if SKIP is not True:
                 with open(merge_msg, 'r') as commit_file:
                     commit = commit_file.read()
@@ -329,6 +329,7 @@ def create_merge_message():
             ('git log --oneline --pretty=format:"        %s" "%s"'
              % ('%s', tags))
     ]
+    SKIP = False
     if previous_tag is not None and merge_type == 'update':
         range = 'refs/tags/%s..refs/tags/%s' % (previous_tag, tag)
         for cmd, value in enumerate(cmds):
@@ -342,7 +343,6 @@ def create_merge_message():
         for cmd, value in enumerate(cmds):
             cmds[cmd] = value.replace(cmds[2], command)
     else:
-        global SKIP
         SKIP = True
     for cmd in cmds:
         talk = subprocess_run(cmd)
@@ -367,7 +367,7 @@ def create_merge_message():
         commit_msg.write(commits)
         if merge_type == 'initial':
             commit_msg.write('\n' + '        ...')
-    return merge_msg
+    return SKIP, merge_msg
 
 
 def main():

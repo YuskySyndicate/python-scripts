@@ -30,8 +30,6 @@ def subprocess_run(cmd):
               'exit code: %d\n'
               'stdout: %s\n'
               'stderr: %s' % (exitCode, talk[0], talk[1]))
-        if exists(merge_msg_file):
-            os.remove(merge_msg_file)
         if exists('/tmp/merge-message'):
             os.remove('/tmp/merge-message')
         if 'CONFLICT' in talk[0]:
@@ -168,12 +166,12 @@ def merge():
             print("Fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
-            SKIP, merge_msg = create_merge_message()
+            SKIP, merge_message = create_merge_message()
             if SKIP is not True:
-                with open(merge_msg, 'r') as commit_file:
+                with open(merge_message, 'r') as commit_file:
                     commit = commit_file.read()
-                    with open(merge_message, 'w+') as commit_file:
-                        commit_file.write('%s: ' % repos + commit)
+                    with open(merge_message, 'w') as commit_file:
+                        commit_file.write(repos + ': ' + commit)
             else:
                 with open(merge_message, 'w+') as commit_file:
                     commit_file.write("%s: Initial tag '%s' into "
@@ -194,8 +192,6 @@ def merge():
                     if cmd == cmds[2]:
                         print('Committing changes...')
                         print()
-                if exists(merge_msg):
-                    os.remove(merge_msg)
                 if exists(merge_message):
                     os.remove(merge_message)
                 break
@@ -204,12 +200,12 @@ def merge():
             print("Fetching %s with tag '%s'" % (repos, tag))
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
-            SKIP, merge_msg = create_merge_message()
+            SKIP, merge_message = create_merge_message()
             if SKIP is not True:
-                with open(merge_msg, 'r') as commit_file:
+                with open(merge_message, 'r') as commit_file:
                     commit = commit_file.read()
-                    with open(merge_message, 'w+') as commit_file:
-                        commit_file.write('%s: ' % repos + commit)
+                    with open(merge_message, 'w') as commit_file:
+                        commit_file.write(repos + ': ' + commit)
             else:
                 with open(merge_message, 'w+') as commit_file:
                     commit_file.write("%s: Merge tag '%s' into "
@@ -222,7 +218,7 @@ def merge():
                     ('git merge -X subtree=drivers/staging/%s FETCH_HEAD '
                      '--no-edit' % repos),
                     ('git commit --amend --file %s --no-edit --quiet'
-                     % merge_msg)
+                     % merge_message)
                 ]
                 print('Committing changes...')
                 for cmd in cmds:
@@ -235,8 +231,6 @@ def merge():
                     else:
                         if repos != 'qcacld-3.0':
                             print()
-                if exists(merge_msg):
-                    os.remove(merge_msg)
                 if exists(merge_message):
                     os.remove(merge_message)
                 break
@@ -292,35 +286,33 @@ def include_to_makefile():
 
 
 def get_previous_tag():
-    revision = tag.split('-')[0] + '-'
-    cmd = 'git tag -l "%s*"' % revision
-    talk = subprocess_run(cmd)
-    list_tag = talk[0].split()
-    if len(list_tag) > 1:
-        if list_tag[-1] == tag:
-            previous_tag = list_tag[-2]
-        else:
-            for index, val in enumerate(list_tag):
-                if val == tag:
-                    # get index of tag in list_tag
-                    tag_index = index
-                    break
-            '''
-            assuming the gap between previous merged tag is only one,
-            will do another code if user have big gap from prev to current
-            tag
-            '''
-            prev_index = tag_index - 1
-            previous_tag = list_tag[prev_index]
-    else:
+    revision = tag.split('-')[0]
+    if merge_type == 'initial':
         previous_tag = None
+        return previous_tag
+    if wlan_type == 'qcacld':
+        path = 'drivers/staging/qcacld-3.0'
+    elif wlan_type == 'prima':
+        path = 'drivers/staging/prima'
+    cmd = ("git log --oneline --grep='%s*' %s "
+           "| head -n 1 | tr '\n' ' '" % (revision, path))
+    try:
+        talk = subprocess_run(cmd)
+    except CalledProcessError:
+        previous_tag = None
+    else:
+        comm = talk[0].replace("'", '').split()
+        val = [t for t in comm if revision in t]
+        try:
+            previous_tag = val[0]
+        except IndexError:
+            previous_tag = None
     return previous_tag
 
 
 def create_merge_message():
-    global merge_msg_file
-    merge_msg = mkstemp()[1]
-    merge_msg_file = merge_msg
+    merge_message = '/tmp/merge-message'
+    os.rename(mkstemp()[1], merge_message)
     previous_tag = get_previous_tag()
     tags = 'None'
     cmds = [
@@ -334,7 +326,7 @@ def create_merge_message():
         range = 'refs/tags/%s..refs/tags/%s' % (previous_tag, tag)
         for cmd, value in enumerate(cmds):
             cmds[cmd] = value.replace(tags, range)
-    elif merge_type == 'initial':
+    elif previous_tag is None and merge_type == 'initial':
         for cmd, value in enumerate(cmds):
             cmds[cmd] = value.replace(tags, tag)
         # don't add all commit changes in initial
@@ -352,7 +344,7 @@ def create_merge_message():
             total_changes = talk[0].strip('\n')
         if cmd == cmds[2]:
             commits = talk[0]
-    with open(merge_msg, 'w') as commit_msg:
+    with open(merge_message, 'w') as commit_msg:
         if merge_type == 'initial':
             commit_msg.write("Initial tag '%s' into %s" % (tag, branch))
         else:
@@ -367,7 +359,7 @@ def create_merge_message():
         commit_msg.write(commits)
         if merge_type == 'initial':
             commit_msg.write('\n' + '        ...')
-    return SKIP, merge_msg
+    return SKIP, merge_message
 
 
 def main():
@@ -383,6 +375,8 @@ def main():
     if check() is True:
         merge()
         include_to_kconfig()
+    if exists('/tmp/merge-message'):
+        os.remove('/tmp/merge-message')
 
 
 if __name__ == '__main__':

@@ -299,6 +299,19 @@ def get_previous_tag():
     try:
         if list_tag[-1] == tag:
             previous_tag = list_tag[-2]
+        else:
+            for index, val in enumerate(list_tag):
+                if val == tag:
+                    # get index of tag in list_tag
+                    tag_index = index
+                    break
+            '''
+            assuming the gap between previous merged tag is only one,
+            will do another code if user have big gap from prev to current
+            tag
+            '''
+            prev_index = tag_index - 1
+            previous_tag = list_tag[prev_index]
     except IndexError:
         previous_tag = None
     return previous_tag

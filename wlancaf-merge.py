@@ -169,10 +169,16 @@ def merge():
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
             merge_msg = create_merge_message()
-            with open(merge_msg, 'r') as commit_file:
-                commit = commit_file.read()
+            if SKIP is not True:
+                with open(merge_msg, 'r') as commit_file:
+                    commit = commit_file.read()
+                    with open(merge_message, 'w+') as commit_file:
+                        commit_file.write('%s: ' % repos + commit)
+            else:
                 with open(merge_message, 'w+') as commit_file:
-                    commit_file.write('%s: ' % repos + commit)
+                    commit_file.write("%s: Initial tag '%s' into "
+                                      "$(git rev-parse --abbrev-ref HEAD)"
+                                      % (repos, tag))
             while True:
                 cmds = [
                     'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd,
@@ -199,10 +205,16 @@ def merge():
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
             merge_msg = create_merge_message()
-            with open(merge_msg, 'r') as commit_file:
-                commit = commit_file.read()
-                with open(merge_message, 'w') as commit_file:
-                    commit_file.write('%s: ' % repos + commit)
+            if SKIP is not True:
+                with open(merge_msg, 'r') as commit_file:
+                    commit = commit_file.read()
+                    with open(merge_message, 'w+') as commit_file:
+                        commit_file.write('%s: ' % repos + commit)
+            else:
+                with open(merge_message, 'w+') as commit_file:
+                    commit_file.write("%s: Merge tag '%s' into "
+                                      "$(git rev-parse --abbrev-ref HEAD)"
+                                      % (repos, tag))
             while True:
                 print('Merging %s into kernel source...'
                       % repos)
@@ -216,7 +228,7 @@ def merge():
                 for cmd in cmds:
                     subprocess_run(cmd)
                 if wlan_type == 'qcacld':
-                # Somehow py2 loop repo from 1 to 3 leaving 2 running last
+                    # Somehow py2 loop repo from 1 to 3 leaving 2 running last
                     if sys.version_info[0] < 3:
                         if repos != 'qca-wifi-host-cmn':
                             print()
@@ -285,14 +297,10 @@ def get_previous_tag():
     talk = subprocess_run(cmd)
     list_tag = talk[0].split()
     try:
-        list_tag[-1]
-    except IndexError:
-        previous_tag = None
-    else:
         if list_tag[-1] == tag:
             previous_tag = list_tag[-2]
-        else:
-            previous_tag = None  # Even though this shouldn't be execute
+    except IndexError:
+        previous_tag = None
     return previous_tag
 
 
@@ -320,6 +328,9 @@ def create_merge_message():
                    ':"        %s" "%s"' % ('%s', tag))
         for cmd, value in enumerate(cmds):
             cmds[cmd] = value.replace(cmds[2], command)
+    else:
+        global SKIP
+        SKIP = True
     for cmd in cmds:
         talk = subprocess_run(cmd)
         if cmd == cmds[0]:

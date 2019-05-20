@@ -296,7 +296,7 @@ def get_previous_tag():
     cmd = 'git tag -l "%s*"' % revision
     talk = subprocess_run(cmd)
     list_tag = talk[0].split()
-    try:
+    if len(list_tag) > 1:
         if list_tag[-1] == tag:
             previous_tag = list_tag[-2]
         else:
@@ -312,7 +312,7 @@ def get_previous_tag():
             '''
             prev_index = tag_index - 1
             previous_tag = list_tag[prev_index]
-    except IndexError:
+    else:
         previous_tag = None
     return previous_tag
 

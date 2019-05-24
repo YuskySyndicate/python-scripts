@@ -295,13 +295,13 @@ def get_previous_tag():
     elif wlan_type == 'prima':
         path = 'drivers/staging/prima'
     cmd = ("git log --oneline --grep='%s*' %s "
-           "| head -n 1 | tr '\n' ' '" % (revision, path))
+           "| head -n 1" % (revision, path))
     try:
         talk = subprocess_run(cmd)
     except CalledProcessError:
         previous_tag = None
     else:
-        comm = talk[0].replace("'", '').split()
+        comm = talk[0].strip('\n').replace("'", '').split()
         val = [t for t in comm if revision in t]
         try:
             previous_tag = val[0]

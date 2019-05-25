@@ -189,6 +189,10 @@ def merge():
                     subprocess_run(cmd)
                     if cmd == cmds[0]:
                         print('Merging %s into kernel source...' % repos)
+                    if cmd == cmds[1]:
+                        REPO = ['qcacld-3.0', 'prima']
+                        if repos in REPO:
+                            include_to_kconfig()
                     if cmd == cmds[2]:
                         print('Committing changes...')
                         print()
@@ -258,8 +262,7 @@ def include_to_kconfig():
                 Kconfig.write(NewKconfig)
             include_to_makefile()
             cmds = ['git add drivers/staging/Kconfig',
-                    'git add drivers/staging/Makefile',
-                    'git commit -m "%s: include it into Source"' % wlan_type]
+                    'git add drivers/staging/Makefile']
             for cmd in cmds:
                 try:
                     subprocess_run(cmd)
@@ -374,7 +377,6 @@ def main():
         raise OSError
     if check() is True:
         merge()
-        include_to_kconfig()
     if exists('/tmp/merge-message'):
         os.remove('/tmp/merge-message')
 

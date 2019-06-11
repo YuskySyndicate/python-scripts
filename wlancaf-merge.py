@@ -163,7 +163,7 @@ def merge():
     merge_message = '/tmp/merge-message'
     if merge_type == 'initial':
         for repos in repo_url:
-            print("Fetching %s with tag '%s'" % (repos, tag))
+            print("Fetching '%s' with tag '%s'" % (repos, tag))
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
             SKIP, merge_message = create_merge_message()
@@ -188,20 +188,26 @@ def merge():
                 for cmd in cmds:
                     subprocess_run(cmd)
                     if cmd == cmds[0]:
-                        print('Merging %s into kernel source...' % repos)
+                        print("Merging '%s' into kernel source..." % repos)
                     if cmd == cmds[1]:
                         REPO = ['qcacld-3.0', 'prima']
                         if repos in REPO:
                             include_to_kconfig()
                     if cmd == cmds[2]:
                         print('Committing changes...')
-                        print()
+                        if wlan_type != 'prima':
+                            if (sys.version_info[0] < 3 and
+                                    repos != 'qca-wifi-host-cmn'):
+                                print()
+                            elif (sys.version_info[0] >= 3 and
+                                    repos != 'qcacld-3.0'):
+                                print()
                 if exists(merge_message):
                     os.remove(merge_message)
                 break
     elif merge_type == 'update':
         for repos in repo_url:
-            print("Fetching %s with tag '%s'" % (repos, tag))
+            print("Fetching '%s' with tag '%s'" % (repos, tag))
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
             SKIP, merge_message = create_merge_message()
@@ -216,7 +222,7 @@ def merge():
                                       "$(git rev-parse --abbrev-ref HEAD)"
                                       % (repos, tag))
             while True:
-                print('Merging %s into kernel source...'
+                print("Merging '%s' into kernel source..."
                       % repos)
                 cmds = [
                     ('git merge -X subtree=drivers/staging/%s FETCH_HEAD '
@@ -228,12 +234,12 @@ def merge():
                 for cmd in cmds:
                     subprocess_run(cmd)
                 if wlan_type == 'qcacld':
-                    # Somehow py2 loop repo from 1 to 3 leaving 2 running last
-                    if sys.version_info[0] < 3:
-                        if repos != 'qca-wifi-host-cmn':
+                    if wlan_type != 'prima':
+                        if (sys.version_info[0] < 3 and
+                                repos != 'qca-wifi-host-cmn'):
                             print()
-                    else:
-                        if repos != 'qcacld-3.0':
+                        elif (sys.version_info[0] >= 3 and
+                                repos != 'qcacld-3.0'):
                             print()
                 if exists(merge_message):
                     os.remove(merge_message)
@@ -256,7 +262,10 @@ def include_to_kconfig():
         with open(join(staging, 'Kconfig'), 'r') as Kconfig:
             ValueKconfig = Kconfig.read()
         if KconfigToCheck not in ValueKconfig:
-            print('Including %s into kernel source...' % wlan_type)
+            if wlan_type == 'prima':
+                print("Including 'prima' into kernel source...")
+            elif wlan_type == 'qcacld':
+                print("Including 'qcacld-3.0' into kernel source...")
             with open(join(staging, 'Kconfig'), 'w') as Kconfig:
                 NewKconfig = ValueKconfig.replace(tempRemove, KconfigToInclude)
                 Kconfig.write(NewKconfig)
@@ -278,10 +287,10 @@ def include_to_makefile():
             MakefileValue = Makefile.read()
         if wlan_type == 'qcacld':
             ValueToCheck = 'CONFIG_QCA_CLD_WLAN'
-            ValueToInclude = '\nobj-$(CONFIG_QCA_CLD_WLAN)\t+= qcacld-3.0/'
+            ValueToInclude = 'obj-$(CONFIG_QCA_CLD_WLAN)\t+= qcacld-3.0/'
         elif wlan_type == 'prima':
             ValueToCheck = 'CONFIG_PRONTO_WLAN'
-            ValueToInclude = '\nobj-$(CONFIG_PRONTO_WLAN)\t+= prima/'
+            ValueToInclude = 'obj-$(CONFIG_PRONTO_WLAN)\t+= prima/'
         if ValueToCheck not in MakefileValue:
             with open(join(staging, 'Makefile'), 'a') as Makefile:
                 Makefile.write(ValueToInclude)

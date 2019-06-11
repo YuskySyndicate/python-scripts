@@ -182,8 +182,8 @@ def merge():
                     'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd,
                     ('git read-tree --prefix=drivers/staging/%s '
                      '-u FETCH_HEAD' % repos),
-                    ('git commit --file %s --no-edit --quiet'
-                     % merge_message)
+                    ('git commit --file %s --no-edit --quiet '
+                     '--gpg-sign --signoff' % merge_message)
                 ]
                 for cmd in cmds:
                     subprocess_run(cmd)
@@ -217,8 +217,8 @@ def merge():
                 cmds = [
                     ('git merge -X subtree=drivers/staging/%s FETCH_HEAD '
                      '--no-edit' % repos),
-                    ('git commit --amend --file %s --no-edit --quiet'
-                     % merge_message)
+                    ('git commit --amend --file %s --no-edit --quiet '
+                     '--gpg-sign --signoff' % merge_message)
                 ]
                 print('Committing changes...')
                 for cmd in cmds:

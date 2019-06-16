@@ -5,8 +5,7 @@
 # Copyright (C) 2019 Adek Maulana
 
 '''
-A simple script to add/update wlan driver QCACLD or PRIMA into/for your,
-Android kernel source. *only qcacld-3.0 and prima were supported.
+Version: 1.0
 '''
 
 from __future__ import print_function

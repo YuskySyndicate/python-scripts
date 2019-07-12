@@ -217,9 +217,13 @@ def merge():
                     ('git commit --amend --file %s --no-edit --quiet '
                      '--gpg-sign --signoff' % merge_message)
                 ]
-                print('Committing changes...')
                 for cmd in cmds:
-                    subprocess_run(cmd)
+                    talk = subprocess_run(cmd)
+                    if 'Already up to date.' in talk[0]:
+                        print('Already up to date.')
+                        break
+                    else:
+                        print('Committing changes...')
                 if wlan_type == 'qcacld':
                     if wlan_type != 'prima':
                         if (sys.version_info[0] < 3 and

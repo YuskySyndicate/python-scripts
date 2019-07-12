@@ -5,7 +5,7 @@
 # Copyright (C) 2019 Adek Maulana
 
 '''
-Version: 1.0
+Version: 1.1
 '''
 
 from __future__ import print_function
@@ -165,17 +165,11 @@ def merge():
             print("Fetching '%s' with tag '%s'" % (repos, tag))
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
-            SKIP, merge_message = create_merge_message()
-            if SKIP is not True:
-                with open(merge_message, 'r') as commit_file:
-                    commit = commit_file.read()
-                    with open(merge_message, 'w') as commit_file:
-                        commit_file.write(repos + ': ' + commit)
-            else:
-                with open(merge_message, 'w+') as commit_file:
-                    commit_file.write("%s: Initial tag '%s' into "
-                                      "$(git rev-parse --abbrev-ref HEAD)"
-                                      % (repos, tag))
+            merge_message = create_merge_message()
+            with open(merge_message, 'r') as commit_file:
+                commit = commit_file.read()
+                with open(merge_message, 'w') as commit_file:
+                    commit_file.write(repos + ': ' + commit)
             while True:
                 cmds = [
                     'git merge -s ours --no-commit %s FETCH_HEAD' % extra_cmd,
@@ -209,17 +203,11 @@ def merge():
             print("Fetching '%s' with tag '%s'" % (repos, tag))
             cmd = 'git fetch --tags -f %s %s' % (repo_url[repos], tag)
             subprocess_run(cmd)
-            SKIP, merge_message = create_merge_message()
-            if SKIP is not True:
-                with open(merge_message, 'r') as commit_file:
-                    commit = commit_file.read()
-                    with open(merge_message, 'w') as commit_file:
-                        commit_file.write(repos + ': ' + commit)
-            else:
-                with open(merge_message, 'w+') as commit_file:
-                    commit_file.write("%s: Merge tag '%s' into "
-                                      "$(git rev-parse --abbrev-ref HEAD)"
-                                      % (repos, tag))
+            merge_message = create_merge_message()
+            with open(merge_message, 'r') as commit_file:
+                commit = commit_file.read()
+                with open(merge_message, 'w') as commit_file:
+                    commit_file.write(repos + ': ' + commit)
             while True:
                 print("Merging '%s' into kernel source..."
                       % repos)
@@ -305,8 +293,8 @@ def get_previous_tag():
         path = 'drivers/staging/qcacld-3.0'
     elif wlan_type == 'prima':
         path = 'drivers/staging/prima'
-    cmd = ("git log --oneline --grep='%s*' %s "
-           "| head -n 1" % (revision, path))
+    cmd = ("git log --pretty=format:'%s' %s | grep '%s' "
+           "| head -n 1" % ('%s', path, revision))
     try:
         talk = subprocess_run(cmd)
     except CalledProcessError:
@@ -332,7 +320,6 @@ def create_merge_message():
             ('git log --oneline --pretty=format:"        %s" "%s"'
              % ('%s', tags))
     ]
-    SKIP = False
     if previous_tag is not None and merge_type == 'update':
         range = 'refs/tags/%s..refs/tags/%s' % (previous_tag, tag)
         for cmd, value in enumerate(cmds):
@@ -345,8 +332,6 @@ def create_merge_message():
                    ':"        %s" "%s"' % ('%s', tag))
         for cmd, value in enumerate(cmds):
             cmds[cmd] = value.replace(cmds[2], command)
-    else:
-        SKIP = True
     for cmd in cmds:
         talk = subprocess_run(cmd)
         if cmd == cmds[0]:
@@ -370,7 +355,7 @@ def create_merge_message():
         commit_msg.write(commits)
         if merge_type == 'initial':
             commit_msg.write('\n' + '        ...')
-    return SKIP, merge_message
+    return merge_message
 
 
 def main():

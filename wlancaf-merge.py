@@ -222,7 +222,8 @@ def merge():
                         print('Already up to date.')
                         break
                     else:
-                        print('Committing changes...')
+                        if cmd == cmds[1]:
+                            print('Committing changes...')
                 if wlan_type == 'qcacld':
                     if wlan_type != 'prima':
                         if (sys.version_info[0] < 3 and
@@ -263,11 +264,7 @@ def include_to_kconfig():
             cmds = ['git add drivers/staging/Kconfig',
                     'git add drivers/staging/Makefile']
             for cmd in cmds:
-                try:
-                    subprocess_run(cmd)
-                except CalledProcessError as err:
-                    break
-                    raise err
+                subprocess_run(cmd)
     return
 
 

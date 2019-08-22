@@ -16,6 +16,7 @@ from argparse import ArgumentParser
 from os import listdir
 from os.path import isdir, exists, join
 from subprocess import PIPE, Popen, CalledProcessError
+from tempfile import mkstemp
 
 
 def subprocess_run(cmd):
@@ -310,6 +311,7 @@ def get_previous_tag():
 
 def create_merge_message():
     merge_message = '/tmp/merge-message'
+    os.rename(mkstemp()[1], merge_message)
     previous_tag = get_previous_tag()
     tags = 'None'
     cmds = [
@@ -323,11 +325,12 @@ def create_merge_message():
         for cmd, value in enumerate(cmds):
             cmds[cmd] = value.replace(tags, range)
     elif previous_tag is None and merge_type == 'initial':
+        for cmd, value in enumerate(cmds):
+            cmds[cmd] = value.replace(tags, tag)
+        # don't add all commit changes in initial
         command = ('git log --oneline --pretty=oneline -45 --pretty=format'
                    ':"        %s" "%s"' % ('%s', tag))
         for cmd, value in enumerate(cmds):
-            cmds[cmd] = value.replace(tags, tag)
-            # don't add all commit changes in initial
             cmds[cmd] = value.replace(cmds[2], command)
     for cmd in cmds:
         talk = subprocess_run(cmd)
@@ -337,7 +340,7 @@ def create_merge_message():
             total_changes = talk[0].strip('\n')
         if cmd == cmds[2]:
             commits = talk[0]
-    with open(merge_message, 'w+') as commit_msg:
+    with open(merge_message, 'w') as commit_msg:
         if merge_type == 'initial':
             commit_msg.write("Initial tag '%s' into %s" % (tag, branch))
         else:

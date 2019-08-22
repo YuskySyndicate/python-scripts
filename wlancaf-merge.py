@@ -70,7 +70,7 @@ def parameters():
 
 
 def repo():
-    global repo_url, staging, subdir
+    global repo_url, staging, subdirs
     staging = 'drivers/staging'
     if wlan_type == 'qcacld':
         repo_url = {
@@ -83,24 +83,24 @@ def repo():
                            'quic/la/platform/vendor/qcom-opensource/wlan/'
                            'qcacld-3.0')
         }
-        subdir = ['fw-api', 'qca-wifi-host-cmn', 'qcacld-3.0']
+        subdirs = ['fw-api', 'qca-wifi-host-cmn', 'qcacld-3.0']
     elif wlan_type == 'prima':
         repo_url = {
             'prima': ('https://source.codeaurora.org/'
                       'quic/la/platform/vendor/qcom-opensource/wlan/prima')
         }
-        subdir = 'prima'
+        subdirs = ['prima']
 
 
 def check():
     if wlan_type == 'qcacld' and merge_type == 'initial':
-        for subdirs in subdir:
-            if isdir(join(staging, subdirs)):
-                if listdir(join(staging, subdirs)):
-                    print('%s exist and not empty' % subdirs)
+        for subdir in subdirs:
+            if isdir(join(staging, subdir)):
+                if listdir(join(staging, subdir)):
+                    print('%s exist and not empty' % subdir)
                     continue
                 else:
-                    if subdirs == 'qcacld-3.0' and not listdir(
+                    if subdir == 'qcacld-3.0' and not listdir(
                         join(staging, 'fw-api')
                              ) and not listdir(
                         join(staging, 'qca-wifi-host-cmn')
@@ -114,13 +114,13 @@ def check():
                   '\nor one of them is exist and not empty.')
             raise OSError
     elif wlan_type == 'qcacld' and merge_type == 'update':
-        for subdirs in subdir:
-            if isdir(join(staging, subdirs)):
-                if not listdir(join(staging, subdirs)):
-                    print('%s exist and empty' % subdirs)
+        for subdir in subdirs:
+            if isdir(join(staging, subdir)):
+                if not listdir(join(staging, subdir)):
+                    print('%s exist and empty' % subdir)
                     continue
                 else:
-                    if subdirs == 'qcacld-3.0' and listdir(
+                    if subdir == 'qcacld-3.0' and listdir(
                         join(staging, 'fw-api')
                              ) and listdir(
                         join(staging, 'qca-wifi-host-cmn')
@@ -134,8 +134,8 @@ def check():
                   '\nor exists but one of them has an empty folder.' + '\n')
             raise OSError
     elif wlan_type == 'prima' and merge_type == 'initial':
-        if isdir(join(staging, subdir)):
-            if listdir(join(staging, subdir)):
+        if isdir(join(staging, subdirs)):
+            if listdir(join(staging, subdirs)):
                 print('\n' + 'You might want to use --init update, '
                       "\nbecause prima is exist and it's not empty." + '\n')
                 raise OSError
@@ -144,8 +144,8 @@ def check():
         else:
             return True
     elif wlan_type == 'prima' and merge_type == 'update':
-        if isdir(join(staging, subdir)):
-            if listdir(join(staging, subdir)):
+        if isdir(join(staging, subdirs)):
+            if listdir(join(staging, subdirs)):
                 return True
             else:
                 print("Folder prima exist, but it's just an empty folder.")

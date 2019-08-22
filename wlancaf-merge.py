@@ -16,7 +16,6 @@ from argparse import ArgumentParser
 from os import listdir
 from os.path import isdir, exists, join
 from subprocess import PIPE, Popen, CalledProcessError
-from tempfile import mkstemp
 
 
 def subprocess_run(cmd):
@@ -311,7 +310,6 @@ def get_previous_tag():
 
 def create_merge_message():
     merge_message = '/tmp/merge-message'
-    os.rename(mkstemp()[1], merge_message)
     previous_tag = get_previous_tag()
     tags = 'None'
     cmds = [
@@ -340,7 +338,7 @@ def create_merge_message():
             total_changes = talk[0].strip('\n')
         if cmd == cmds[2]:
             commits = talk[0]
-    with open(merge_message, 'w') as commit_msg:
+    with open(merge_message, 'w+') as commit_msg:
         if merge_type == 'initial':
             commit_msg.write("Initial tag '%s' into %s" % (tag, branch))
         else:

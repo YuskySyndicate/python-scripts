@@ -445,12 +445,21 @@ def zip_now(zippath):
 def finalzip_sign(finalzip):
     keystore_password = variables()['keystore']
     scriptdir = variables()['scriptdir']
+    device = parameters()['device']
+    upload = parameters()['upload']
+    finalzip = variables()['finalzip']
+    version = parameters()['version']
+    zipname = variables()['zipname']
     if isfile(finalzip):
         keystore = join(scriptdir, 'bin/stormguard.keystore')
         cmd = (f'echo "{keystore_password}" | '
                f'jarsigner -keystore {keystore} '
                f'"{finalzip}" stormguard')
         subprocess_run(cmd)
+        if upload is True:
+            print('==> Uploading...')
+            Uploads(device, version, zipname, finalzip)
+            print('==> Upload success...')
     else:
         raise FileNotFoundError
 
@@ -658,18 +667,9 @@ def main():
     if isdir('Makefile'):
         print('Makefile is a directory...')
         raise IsADirectoryError
-    device = parameters()['device']
-    upload = parameters()['upload']
-    finalzip = variables()['finalzip']
-    version = parameters()['version']
-    zipname = variables()['zipname']
     P = Process(target=make_wrapper, name='make_kernel')
     P.start()
     P.join()
-    if upload is True:
-        print('==> Uploading...')
-        Uploads(device, version, zipname, finalzip)
-        print('==> Upload success...')
 
 
 if __name__ == '__main__':

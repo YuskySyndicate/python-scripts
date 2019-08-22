@@ -295,9 +295,8 @@ def get_previous_tag():
         path = 'drivers/staging/prima'
     cmd = ("git log --pretty=format:'%s' %s | grep '%s' "
            "| head -n 1" % ('%s', path, revision))
-    try:
-        talk = subprocess_run(cmd)
-    except CalledProcessError:
+    talk = subprocess_run(cmd)
+    if talk[0] is None:
         previous_tag = None
     else:
         comm = talk[0].strip('\n').replace("'", '').split()

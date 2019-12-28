@@ -45,7 +45,7 @@ if [[ ! $URL ]]; then
 	exit 1
 fi
 
-WGET="wget -q -O -"
+CURL="curl -Y 1 -y 9 -s"
 
 missing=false
 for cmd in openssl; do
@@ -67,10 +67,10 @@ hex=$(printf "%016x" \
 )
 md5=$(echo -n "$URL" | openssl md5 | grep -E -o '[0-9a-f]{32}')
 
-json=$($WGET --header 'Content-Type: application/json' --post-data '[{"a":"g", "g":"1", "p":"'"$id"'"}]' 'https://g.api.mega.co.nz/cs?id=&ak=') || exit 1; json="${json#"[{"}"; json="${json%"}]"}"
+json=$($CURL --header 'Content-Type: application/json' --data '[{"a":"g", "g":"1", "p":"'"$id"'"}]' 'https://g.api.mega.co.nz/cs?id=&ak=') || exit 1; json="${json#"[{"}"; json="${json%"}]"}"
 file_url="${json##*'"g":'}"; file_url="${file_url%%,*}"; file_url="${file_url//'"'/}"
 
-json=$($WGET --header 'Content-Type: application/json' --post-data '[{"a":"g", "p":"'"$id"'"}]' 'https://g.api.mega.co.nz/cs?id=&ak=') || exit 1
+json=$($CURL --header 'Content-Type: application/json' --data '[{"a":"g", "p":"'"$id"'"}]' 'https://g.api.mega.co.nz/cs?id=&ak=') || exit 1
 at="${json##*'"at":'}"; at="${at%%,*}"; at="${at//'"'/}"
 
 json=$(echo "${at}==" | tr '\-_' '+/' | tr -d ',' | openssl enc -a -A -d -aes-128-cbc -K "$hex" -iv "00000000000000000000000000000000" -nopad | tr -d '\0'); json="${json#"MEGA{"}"; json="${json%"}"}"
@@ -80,7 +80,7 @@ if [[ $file_name == *,* ]]; then
 fi
 file_name="${file_name//'"'/}"
 
-#$WGET "$file_url" | openssl enc -d -aes-128-ctr -K "$hex" -iv "${raw_hex:32:16}0000000000000000" > "$file_name"
+#$CURL "$file_url" | openssl enc -d -aes-128-ctr -K "$hex" -iv "${raw_hex:32:16}0000000000000000" > "$file_name"
 
 echo ""
 echo "Direct Link	: $file_url"

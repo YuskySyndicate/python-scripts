@@ -71,6 +71,7 @@ file_url="${json##*'"g":'}"; file_url="${file_url%%,*}"; file_url="${file_url//'
 
 json=$($CURL --header 'Content-Type: application/json' --data '[{"a":"g", "p":"'"$id"'"}]' 'https://g.api.mega.co.nz/cs?id=&ak=') || exit 1
 at="${json##*'"at":'}"; at="${at%%,*}"; at="${at//'"'/}"
+file_size="${json##*'"s":'}'"; file_size="${file_size%%,*}"; file_size="${file_size//'"'/}"
 
 json=$(echo "${at}==" | tr '\-_' '+/' | tr -d ',' | openssl enc -a -A -d -aes-128-cbc -K "$hex" -iv "00000000000000000000000000000000" -nopad | tr -d '\0'); json="${json#"MEGA{"}"; json="${json%"}"}"
 file_name="${json##*'"n":'}"
@@ -79,6 +80,6 @@ if [[ $file_name == *,* ]]; then
 fi
 file_name="${file_name//'"'/}"
 
-$CURL "$file_url" | openssl enc -d -aes-128-ctr -K "$hex" -iv "${raw_hex:32:16}0000000000000000" > "$file_name"
+# $CURL "$file_url" | openssl enc -d -aes-128-ctr -K "$hex" -iv "${raw_hex:32:16}0000000000000000" > "$file_name"
 
-echo "Successfully downloaded..."
+echo "{\"file_name\" : \"${file_name}\", \"file_size\" : \"$file_size\", \"url\" : \"${file_url}\", \"raw_hex\" : \"${raw_hex:32:16}0000000000000000\", \"hex\" : \"${hex}\"}"

@@ -65,7 +65,7 @@ hex=$(printf "%016x" \
 	$(( 0x${raw_hex:0:16} ^ 0x${raw_hex:32:16} )) \
 	$(( 0x${raw_hex:16:16} ^ 0x${raw_hex:48:16} ))
 )
-md5=$(echo -n "$URL" | openssl md5 | grep -E -o '[0-9a-f]{32}')
+md5_url=$(echo -n "$URL" | openssl md5 | grep -E -o '[0-9a-f]{32}' > md5)
 
 json=$($CURL --header 'Content-Type: application/json' --data '[{"a":"g", "g":"1", "p":"'"$id"'"}]' 'https://g.api.mega.co.nz/cs?id=&ak=') || exit 1; json="${json#"[{"}"; json="${json%"}]"}"
 file_url="${json##*'"g":'}"; file_url="${file_url%%,*}"; file_url="${file_url//'"'/}"
@@ -80,11 +80,6 @@ if [[ $file_name == *,* ]]; then
 fi
 file_name="${file_name//'"'/}"
 
-#$CURL "$file_url" | openssl enc -d -aes-128-ctr -K "$hex" -iv "${raw_hex:32:16}0000000000000000" > "$file_name"
+$CURL "$file_url" | openssl enc -d -aes-128-ctr -K "$hex" -iv "${raw_hex:32:16}0000000000000000" > "$file_name"
 
-echo ""
-echo "Direct Link	: $file_url"
-echo "File Name	: $file_name"
-echo "MD5		: $md5"
-echo "HEX		: $hex"
-echo "RAW_HEX		: ${raw_hex:32:16}0000000000000000"
+echo "{\"file_name\" : \"${file_name}\", \"md5\" : ${md5_url}}"
